@@ -1,6 +1,6 @@
 import unittest
 
-from .tools import dataset
+from FIR_CNN_LSTM.tools import dataset
 
 test_data_dir = "test_dataset"
 
