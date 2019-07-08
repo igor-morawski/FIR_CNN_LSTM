@@ -1,3 +1,6 @@
+'''
+For accessing dataset and dataset samples only.
+'''
 import argparse
 import glob
 import os
@@ -44,6 +47,14 @@ SKIP_FRAMES = 20
 DATSAET_URL = "https://github.com/muralab/Low-Resolution-FIR-Action-Dataset/archive/master.zip"
 DATASET_FN_ZIP = "Low-Resolution-FIR-Action-Dataset-master.zip"
 
+FILE_COLUMN = 0
+ACTOR_COLUMN = 4
+
+
+ACTORS = np.array([
+    'human1', 'human2', 'human3', 'human4', 'human5', 'human6',  
+    'human7', 'human8', 'human9'], dtype=object)
+SUBJECTS = ACTORS
 
 def download(dataset_dir: str, dataset_name: str = "dataset"):
     print("Downloading FIR Action Dataset...")
@@ -59,7 +70,7 @@ def download(dataset_dir: str, dataset_name: str = "dataset"):
     return
 
 
-def load_annotation(dataset_dir: str) -> pd.core.frame.DataFrame:
+def _load_annotation(dataset_dir: str) -> pd.core.frame.DataFrame:
     pattern = os.path.join(dataset_dir, 'annotation', '*_human.csv')
     generator = glob.iglob(pattern)
 
@@ -67,71 +78,74 @@ def load_annotation(dataset_dir: str) -> pd.core.frame.DataFrame:
                       for fn in generator], ignore_index=True)
 
 
-def read_sequence_annotation(sequence_name: str, annotation: pd.core.frame.DataFrame = None) -> list:
+def _read_sequence_annotation(sequence_name: str, annotation: pd.core.frame.DataFrame = None) -> list:
     if annotation is None:
         return []
     sequence_annotation_pd = annotation[annotation[0] == sequence_name]
     return sequence_annotation_pd.iloc[:, 1:].values.tolist()
 
 
-def list_sequences(dataset_dir: str) -> list:
+def _list_sequences(dataset_dir: str) -> list:
     pattern = os.path.join(dataset_dir, '*', 'raw', '*.csv')
     generator = glob.iglob(pattern)
     return [sequence for sequence in generator]
 
+def _excludeActor(annotation: pd.core.frame.DataFrame, actor: str) -> pd.core.frame.DataFrame:
+    return annotation[annotation[ACTOR_COLUMN] != actor]
 
-def sequence_heatmap(sequence: np.ndarray, min: int = 20, max: int = 40, cv_colormap: int = cv2.COLORMAP_JET) -> np.ndarray:
-    sequence_clipped = np.clip(sequence, min, max)
-    sequence_normalized = (255 * ((sequence_clipped-min) /
-                                  (max-min))).astype(np.uint8)
-    shape = sequence.shape
-
-    heatmap_flat = cv2.applyColorMap(
-        sequence_normalized.flatten(), cv_colormap)
-
-    return heatmap_flat.reshape([shape[0], shape[1], shape[2], 3])
-
+def _filterActor(annotation: pd.core.frame.DataFrame, actor: str) -> pd.core.frame.DataFrame:
+    return annotation[annotation[ACTOR_COLUMN] == actor]
 
 class Dataset():
-    def __init__(self, dataset_dir: str, sample: bool = False, samples_k: int = 10, labels=None):
+    def __init__(self, dataset_dir: str, sample: bool = False, samples_k: int = 10, labels=None, actor = None, exclude_actor = None, minmax_normalized = None):
         if not os.path.exists(dataset_dir):
-            raise OSError(2, 'No such file or directory') 
-        self.annotation = load_annotation(dataset_dir)
-        self.sequences = list_sequences(dataset_dir)
+            raise OSError(2, 'No such file or directory', dataset_dir)
+        self.sequences = _list_sequences(dataset_dir)
         if sample:
             self.sequences = random.sample(self.sequences, samples_k)
         if labels:
             self.labels = labels
+        self.annotation = _load_annotation(dataset_dir)
         self.directory = dataset_dir
+        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+        if actor:
+            self.filterActor(actor)
+        if exclude_actor:
+            self.excludeActor(exclude_actor)
+        self.minmax_normalized = minmax_normalized
 
     def __len__(self):
         return len(self.sequences)
 
     def __getitem__(self, idx):
-        return Sequence(self.sequences[idx], dataset_annotation=self.annotation)
+        return Sequence(self.sequences[idx], dataset_annotation=self.annotation, minmax_normalized = self.minmax_normalized)
+
+    def excludeActor(self, actor: str):
+        self.annotation = _excludeActor(self.annotation, actor)
+        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+        self._updateSequences()
+        return
+    
+    def filterActor(self, actor: str):
+        self.annotation = _filterActor(self.annotation, actor)
+        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+        self._updateSequences()
+        return
+    
+    def _updateSequences(self):
+        annotation_sequences_list = pd.unique(self.annotation[FILE_COLUMN])
+        for fn in self.sequences:
+            path, sequence_name = os.path.split(fn)
+            if sequence_name not in annotation_sequences_list:
+                self.sequences.remove(fn)
 
 
-class Action(Dataset):
-    def __init__(self, dataset, label, samples_k=3):
-        annotation = dataset.annotation
-        self.annotation = annotation[annotation[3].str.contains(
-            label)].sample(samples_k)
-        #[sequence for sequence in dataset.sequences if b[0].str.contains(sequence.split(os.path.sep)[-1]).any()]
-        self.sequences = list(self.annotation[0].unique())
-        self.directory = dataset.directory
-
-    def __len__(self):
-        return len(self.annotation)
-
-    def __getitem__(self, idx):
-        sequence_name = self.annotation[0].iloc[idx]
-        fn = os.path.join(self.directory, sequence_name.split("_")[
-                          0], "raw", sequence_name)
-        return Sequence(fn, frame_start=self.annotation[1].iloc[idx], frame_stop=self.annotation[2].iloc[idx])
+def _minmax_normalize(array: np.ndarray, norm_min: float, norm_max: float) -> np.ndarray:
+    return (array - norm_min)/(norm_max - norm_min)
 
 
 class Sequence(np.ndarray):
-    def __new__(cls, fn: str, dataset_annotation=None, frame_start=None, frame_stop=None):
+    def __new__(cls, fn: str, dataset_annotation=None, frame_start=None, frame_stop=None, minmax_normalized = None):
         # read dataframe
         dataframe = pd.read_csv(fn, skiprows=[0, 1], header=None)
         # skip time and PTAT columns
@@ -140,11 +154,19 @@ class Sequence(np.ndarray):
         min = pixels[SKIP_FRAMES:].min()
         max = pixels[SKIP_FRAMES:].max()
         PTAT = PTAT[frame_start:frame_stop]
+        if minmax_normalized:
+            pixels = _minmax_normalize(pixels, min, max)
+            #use numpy's min max even though we have to get 0 and 1...
+            #so that any future changes that cause bugs are caught in testing
+            min = pixels[SKIP_FRAMES:].min()
+            max = pixels[SKIP_FRAMES:].max()
         pixels = pixels[frame_start:frame_stop][:]
         # reshape to [frames, h, w] array
         frames, h, w = pixels.shape[0], (int)(
-            sqrt(pixels.shape[1])), (int)(sqrt(pixels.shape[1]))
-        obj = np.asarray(pixels.reshape([frames, h, w])).view(cls)
+            sqrt(pixels.shape[1])), (int)(sqrt(pixels.shape[1])) 
+        pixels = pixels.reshape([frames, h, w])
+
+        obj = np.asarray(pixels).view(cls)
         # add custom sequence attributes
         obj.filename = fn
         path, sequence_name = os.path.split(fn)
@@ -168,4 +190,6 @@ class Sequence(np.ndarray):
         self.PTAT = getattr(obj, 'PTAT', None)
 
     def annotation(self):
-        return read_sequence_annotation(self.sequence_name, self.dataset_annotation)
+        return _read_sequence_annotation(self.sequence_name, self.dataset_annotation)
+
+
