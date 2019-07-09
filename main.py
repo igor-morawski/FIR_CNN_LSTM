@@ -55,10 +55,9 @@ if __name__ == "__main__":
     "--download", action="store_true",
                       help='Download the dataset.'
 )
-
   parser.add_argument(
     "--prepare", action="store_true",
-                      help='Download the dataset.'
+                      help='Prepare the dataset.'
 )
   FLAGS, unparsed = parser.parse_known_args()
 
