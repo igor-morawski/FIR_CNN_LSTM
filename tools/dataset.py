@@ -48,6 +48,12 @@ RAW_LABELS = ('walk', 'walk1', 'walk2',
 'falling1', 'falling2',
 'sit', 'lie', 'stand')
 
+
+ACTION_LABELS = ('walk', 
+'sitdown', 'standup',
+'falling', 
+'sit', 'lie', 'stand')
+
 SKIP_FRAMES = 20
 DATSAET_URL = "https://github.com/muralab/Low-Resolution-FIR-Action-Dataset/archive/master.zip"
 DATASET_FN_ZIP = "Low-Resolution-FIR-Action-Dataset-master.zip"
