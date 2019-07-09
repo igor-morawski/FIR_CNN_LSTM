@@ -55,8 +55,14 @@ if __name__ == "__main__":
     default=100,
     help='How many images to train on at a time.'
 )
+  parser.add_argument(
+    "--download", action="store_true",
+                      help='Download the dataset.'
+)
   FLAGS, unparsed = parser.parse_known_args()
 
+  if FLAGS.download:
+      dataset.download("..")
   data_normalized = Dataset(FLAGS.dataset_dir, minmax_normalized=True)
   prepare.sequences_by_actor(data_normalized, FLAGS.cache_dir)
 

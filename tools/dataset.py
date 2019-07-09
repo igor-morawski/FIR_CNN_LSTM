@@ -61,17 +61,27 @@ ACTORS = np.array([
     'human7', 'human8', 'human9'], dtype=object)
 SUBJECTS = ACTORS
 
-def download(dataset_dir: str, dataset_name: str = "dataset"):
-    print("Downloading FIR Action Dataset...")
-    wget.download(DATSAET_URL, bar=wget.bar_thermometer)
-    path, filename = dataset_dir, dataset_name
+def download(download_dir: str = "..", dataset_name: str = "dataset"):
+    """
+    Downloads the dataset (from github) and to dataset_dir and unpacks it to dataset_name
+
+    Args:
+    download_dir - where to download the file
+    dataset_name - unpacked folder's name
+    """
+    if os.path.exists(os.path.join(download_dir, dataset_name)):
+        print("[ERROR] Folder {} exists. Aborting download of the dataset.".format(os.path.join(dataset_name, download_dir)))
+        return
+    print("[INFO] Downloading FIR Action Dataset...")
+    wget.download(DATSAET_URL, bar=wget.bar_adaptive)
+    path, filename = download_dir, dataset_name
     with zipfile.ZipFile(DATASET_FN_ZIP, "r") as zip_ref:
         zip_ref.extractall(path)
     os.remove(DATASET_FN_ZIP)
     dataset_fn = DATASET_FN_ZIP.split(".")[-2]
     os.rename(os.path.join(path, dataset_fn), os.path.join(path, filename))
     print("")
-    print("Dataset downloaded to %s" % os.path.join(path, filename))
+    print("[INFO] Dataset downloaded to %s" % os.path.join(path, filename))
     return
 
 
