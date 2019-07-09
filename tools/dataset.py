@@ -212,6 +212,13 @@ class Sequence(np.ndarray):
     def annotation(self):
         return _read_sequence_annotation(self.sequence_name, self.dataset_annotation)
 
-    def actions(self):
-        pass
+    def as_uint8(self):
+        minmax_normalized = None
+        if (self.temp_min == 0) and (self.temp_max == 1):
+            minmax_normalized = self.copy()
+        else:
+            minmax_normalized = _minmax_normalize(self.copy(), self.temp_min, self.temp_max)
+        return (255 * minmax_normalized).astype(np.uint8)
+
+
 

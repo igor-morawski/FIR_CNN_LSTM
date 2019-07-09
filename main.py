@@ -7,10 +7,6 @@ import argparse
 
 import numpy as np
 
-
-def cache_sequences(cache_dir, ):
-  pass
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument(
@@ -59,10 +55,19 @@ if __name__ == "__main__":
     "--download", action="store_true",
                       help='Download the dataset.'
 )
+
+  parser.add_argument(
+    "--prepare", action="store_true",
+                      help='Download the dataset.'
+)
   FLAGS, unparsed = parser.parse_known_args()
 
   if FLAGS.download:
       dataset.download("..")
+  
   data_normalized = Dataset(FLAGS.dataset_dir, minmax_normalized=True)
-  prepare.sequences_by_actor(data_normalized, FLAGS.cache_dir)
+
+  if FLAGS.prepare:
+    prepare.sequences_by_actor(data_normalized, FLAGS.cache_dir)
+    prepare.optical_flow(data_normalized, FLAGS.cache_dir)
 
