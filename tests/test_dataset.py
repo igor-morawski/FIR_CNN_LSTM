@@ -78,6 +78,31 @@ class TestDataset(unittest.TestCase):
         sequences = [test_fn2]
         self.assertEqual(data.sequences, sequences)
 
+    def test_reloading_actors(self):
+        data = dataset.Dataset(test_data_dir)
+        actors = np.array(['human1', 'human2', 'human7', 'human8', 'human9'], dtype=object)
+        self.assertTrue(np.array_equal(data.actors, actors))
+        sequences = [test_fn1, test_fn2]
+        self.assertEqual(data.sequences, sequences)
+
+        data.excludeActor('human8')
+        actors = np.array(['human1', 'human2', 'human7', 'human9'], dtype=object)
+        sequences = [test_fn1, test_fn2]
+        self.assertEqual(data.sequences, sequences)
+        self.assertTrue(np.array_equal(data.actors, actors))
+
+        data.filterActor('human7')
+        actors = np.array(['human7'], dtype=object)
+        self.assertTrue(np.array_equal(data.actors, actors))
+        sequences = [test_fn2]
+        self.assertEqual(data.sequences, sequences)
+
+        data.reload() 
+        actors = np.array(['human1', 'human2', 'human7', 'human8', 'human9'], dtype=object)
+        sequences = [test_fn1, test_fn2]
+        self.assertEqual(data.sequences, sequences)
+        self.assertTrue(np.array_equal(data.actors, actors))
+
 
 
 class TestSequence(unittest.TestCase):

@@ -43,6 +43,11 @@ LABELS_REGEX = dict([
 
 ])
 
+RAW_LABELS = ('walk', 'walk1', 'walk2',
+'sitdown', 'standup',
+'falling1', 'falling2',
+'sit', 'lie', 'stand')
+
 SKIP_FRAMES = 20
 DATSAET_URL = "https://github.com/muralab/Low-Resolution-FIR-Action-Dataset/archive/master.zip"
 DATASET_FN_ZIP = "Low-Resolution-FIR-Action-Dataset-master.zip"
@@ -97,14 +102,12 @@ def _filterActor(annotation: pd.core.frame.DataFrame, actor: str) -> pd.core.fra
     return annotation[annotation[ACTOR_COLUMN] == actor]
 
 class Dataset():
-    def __init__(self, dataset_dir: str, sample: bool = False, samples_k: int = 10, labels=None, actor = None, exclude_actor = None, minmax_normalized = None):
+    def __init__(self, dataset_dir: str, minmax_normalized: bool = None,  actor:str = None, exclude_actor:str = None, sample: bool = False, samples_k: int = 10):
         if not os.path.exists(dataset_dir):
             raise OSError(2, 'No such file or directory', dataset_dir)
         self.sequences = _list_sequences(dataset_dir)
         if sample:
             self.sequences = random.sample(self.sequences, samples_k)
-        if labels:
-            self.labels = labels
         self.annotation = _load_annotation(dataset_dir)
         self.directory = dataset_dir
         self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
@@ -113,6 +116,8 @@ class Dataset():
         if exclude_actor:
             self.excludeActor(exclude_actor)
         self.minmax_normalized = minmax_normalized
+        self._dataset_dir = dataset_dir
+        self._initial_sequences = self.sequences.copy()
 
     def __len__(self):
         return len(self.sequences)
@@ -122,17 +127,31 @@ class Dataset():
 
     def excludeActor(self, actor: str):
         self.annotation = _excludeActor(self.annotation, actor)
-        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+        self._updateActors()
         self._updateSequences()
         return
     
     def filterActor(self, actor: str):
         self.annotation = _filterActor(self.annotation, actor)
-        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+        self._updateActors()
         self._updateSequences()
         return
     
+    def reload(self):
+        self.sequences = self._initial_sequences
+        self.annotation = _load_annotation(self._dataset_dir)
+        self._updateActors()
+        self._updateSequences()
+        return
+    
+    def _updateActors(self):
+        self.actors = pd.unique(self.annotation[ACTOR_COLUMN])
+
     def _updateSequences(self):
+        '''
+        Updates sequences by removing any sequence name that is not in annotation
+        If needed reload annotation before running updateSequences!
+        '''
         annotation_sequences_list = pd.unique(self.annotation[FILE_COLUMN])
         for fn in self.sequences:
             path, sequence_name = os.path.split(fn)
@@ -179,17 +198,10 @@ class Sequence(np.ndarray):
         obj.PTAT = PTAT
         return obj
 
-    def __array_finalize__(self, obj):
-        if obj is None:
-            return
-        self.filename = getattr(obj, 'filename', None)
-        self.sequence_name = getattr(obj, 'sequence_name', None)
-        self.dataset_annotation = getattr(obj, 'dataset_annotation', None)
-        self.start = getattr(obj, 'start', None)
-        self.stop = getattr(obj, 'stop', None)
-        self.PTAT = getattr(obj, 'PTAT', None)
 
     def annotation(self):
         return _read_sequence_annotation(self.sequence_name, self.dataset_annotation)
 
+    def actions(self):
+        pass
 
