@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm 
 
 import numpy as np
 
@@ -25,9 +26,10 @@ def sequences_by_actor(dataset, cache_dir):
     if os.path.exists(samples_dir):
         print("[INFO] Removing {}...".format(samples_dir))
     ensure_dir_exists(samples_dir)
+    print("[INFO] Adding samples to {}...".format(samples_dir))
     for actor in dataset.actors:
         ensure_dir_exists(os.path.join(samples_dir, actor))
-    for sample in dataset:
+    for sample in tqdm(dataset):
         name = sample.sequence_name.split(".")[0]
         for action in sample.annotation():
             start, stop, label, actor = action
