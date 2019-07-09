@@ -147,6 +147,14 @@ class TestSequence(unittest.TestCase):
             self.skipTest("SKIP_FRAMES must be set to 20")
         frame_start = 20
         frame_stop = 23
+        sequence = dataset.Sequence(test_array_fn, frame_start = frame_start, frame_stop = frame_stop, minmax_normalized=False)
+        self.assertTrue(np.array_equal(sequence, test_array))
+        self.assertEqual(sequence.temp_min, 0)
+        self.assertEqual(sequence.temp_max, 2040)
+        sequence = dataset.Sequence(test_array_fn, frame_start = frame_start, frame_stop = frame_stop, minmax_normalized=True)
+        self.assertTrue(np.array_equal(sequence, test_array_minmax_normalized))
+        self.assertEqual(sequence.temp_min, 0)
+        self.assertEqual(sequence.temp_max, 1)
 
         frame_start = 23
         frame_stop = 24
@@ -159,6 +167,19 @@ class TestSequence(unittest.TestCase):
         self.assertTrue(np.array_equal(sequence, np.ones([1,16,16])))
         self.assertEqual(sequence.temp_min, 0)
         self.assertEqual(sequence.temp_max, 1)
+
+    def test_as_uint8(self):
+        frame_start = 20
+        frame_stop = None
+        sequence_notnormalized = dataset.Sequence(test_fn1, frame_start = frame_start, frame_stop = frame_stop, minmax_normalized=False)
+        sequence_normalized = dataset.Sequence(test_fn1, frame_start = frame_start, frame_stop = frame_stop, minmax_normalized=True)
+        self.assertNotEqual(sequence_notnormalized.temp_min, 0)
+        self.assertNotEqual(sequence_notnormalized.temp_max, 1)
+        self.assertEqual(sequence_normalized.temp_min, 0)
+        self.assertEqual(sequence_normalized.temp_max, 1)
+        self.assertFalse(np.array_equal(sequence_notnormalized, sequence_normalized))
+        normalized_uint8 = (255 * sequence_normalized).astype(np.uint8)
+        self.assertTrue(np.array_equal(sequence_notnormalized.as_uint8(), normalized_uint8))
 
         
 

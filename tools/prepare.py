@@ -3,6 +3,8 @@ from tqdm import tqdm
 
 import numpy as np
 
+from tools import flow
+
 def ensure_structure_exist(dir_list):
     """Makes sure the folder exists on disk.
 
@@ -39,5 +41,25 @@ def sequences_by_actor(dataset, cache_dir):
             with open(path, 'wb+') as handler:
                 np.save(handler, action, allow_pickle=False)
                 handler.flush()
+    return
 
-    pass 
+def optical_flow(dataset, cache_dir):
+    flow_dir = os.path.join(cache_dir, "optical_flow")
+    if os.path.exists(flow_dir):
+        print("[INFO] Removing {}...".format(flow_dir))
+    ensure_dir_exists(flow_dir)
+    print("[INFO] Calculating optical flow and saving to {}...".format(flow_dir))
+    for actor in dataset.actors:
+        ensure_dir_exists(os.path.join(flow_dir, actor))
+    for sample in tqdm(dataset):
+        name = sample.sequence_name.split(".")[0]
+        for action in sample.annotation():
+            start, stop, label, actor = action
+            stop += 1
+            fn = label + "_" + name + "_" + str(start) + "_" + str(stop) + ".npy"
+            path = os.path.join(flow_dir, actor, fn)
+            flow_array = flow.farneback(sample.as_uint8())
+            with open(path, 'wb+') as handler:
+                np.save(handler, flow_array, allow_pickle=False)
+                handler.flush()
+    return
