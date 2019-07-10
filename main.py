@@ -22,10 +22,16 @@ if __name__ == "__main__":
     help='Where to save the trained model.'
 )
   parser.add_argument(
-    '--cache_dir',
+    '--temperature_dir',
     type=str,
-    default="/"+os.path.join("tmps", "cache"),
-    help='Where to save the cached sequences.'
+    default="/"+os.path.join("tmps", "cache", "temperature"),
+    help='Where to save the cached sequences (temperature).'
+)
+  parser.add_argument(
+    '--flow_dir',
+    type=str,
+    default="/"+os.path.join("tmps", "cache", "optical_flow"),
+    help='Where to save the cached sequences (optical flow).'
 )
   parser.add_argument(
     '--epochs',
@@ -67,6 +73,6 @@ if __name__ == "__main__":
   data_normalized = Dataset(FLAGS.dataset_dir, minmax_normalized=True)
 
   if FLAGS.prepare:
-    prepare.sequences_by_actor(data_normalized, FLAGS.cache_dir)
-    prepare.optical_flow(data_normalized, FLAGS.cache_dir)
+    prepare.sequences_by_actor(data_normalized, FLAGS.temperature_dir)
+    prepare.optical_flow(data_normalized, FLAGS.flow_dir)
 
