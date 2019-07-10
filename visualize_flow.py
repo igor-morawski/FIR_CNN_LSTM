@@ -36,12 +36,6 @@ if __name__ == "__main__":
     help='Where cached sequences are saved (optical flow).'
 )
   parser.add_argument(
-    '--temperature_dir',
-    type=str,
-    default="/"+os.path.join("tmps", "cache", "temperature"),
-    help='Where cached sequences are saved (temperature).'
-)
-  parser.add_argument(
     '--files_list',
     type=str,
     default="/"+os.path.join("tmps", "filestovisualize.txt"),
@@ -107,14 +101,6 @@ if __name__ == "__main__":
         writer.append_data(frame[:, :, ::-1])
       #write extra one frame to make up for the difference between optical flow and temperature sequences lengths
       writer.append_data(np.zeros_like(frame))
-
-'''
-  temperatures = []
-  for name in files:
-    fn = glob(os.path.join(FLAGS.temperature_dir,"**",name))[0]
-    temperature = np.load(fn)
-    temperatures.append(temperature)
-'''
   
   
 
