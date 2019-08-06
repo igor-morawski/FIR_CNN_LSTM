@@ -30,10 +30,10 @@ if __name__ == "__main__":
     help='Where to save visualized sequences.'
 )
   parser.add_argument(
-    '--flow_dir',
+    '--temperature_dir',
     type=str,
-    default="/"+os.path.join("tmps", "cache", "optical_flow"),
-    help='Where cached sequences are saved (optical flow).'
+    default="/"+os.path.join("tmps", "cache", "temperature"),
+    help='Where cached sequences are saved (temperature).'
 )
   parser.add_argument(
     '--files_list',
@@ -46,7 +46,7 @@ if __name__ == "__main__":
                       help='Clean the visualize_dir (remove all exisiting files in the directory).'
 )
   FLAGS, unparsed = parser.parse_known_args()
-  output_dir = os.path.join(FLAGS.visualize_dir, os.path.split(FLAGS.flow_dir)[1])
+  output_dir = os.path.join(FLAGS.visualize_dir, os.path.split(FLAGS.temperature_dir)[1])
   if FLAGS.clean:
     prepare.remove_dir_tree(output_dir)
   prepare.ensure_dir_exists(output_dir)
@@ -68,35 +68,34 @@ if __name__ == "__main__":
   for name in files:
     if len(name) == 0:
       files.remove(name)
-  
-  flows = []
-  for name in files:
-    fn = glob(os.path.join(FLAGS.flow_dir,"**",name))[0]
-    flow = np.load(fn)
-    flows.append(flow)
 
-  def flow2bgr(flow_frame):
-    hsv = np.zeros(flow_frame.shape[:-1] + (3,))
-    mag, ang = cv2.cartToPolar(flow_frame[...,0], flow_frame[...,1])
-    hsv[...,0] = ang*180/np.pi/2
-    hsv[...,1] = 255
-    hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
-    hsv = hsv.astype(np.uint8)
-    bgr = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
-    return bgr
+  temperatures = []
+  for name in files:
+    fn = glob(os.path.join(FLAGS.temperature_dir,"**",name))[0]
+    temperature = np.load(fn)
+    temperatures.append(temperature)
+
+  grays = []
+  for temperature in temperatures:
+    gray = (255 * temperature).astype(np.uint8)
+    grays.append(gray)
+
+  def heatmap(sequence, cv_colormap: int = cv2.COLORMAP_JET):
+    heatmap_flat = cv2.applyColorMap(
+        sequence.flatten(), cv_colormap)
+    return heatmap_flat.reshape(sequence.shape + (3,))
 
   bgrs = []
-  for flow in flows:
-    bgr = np.zeros(flow.shape[:-1] + (3,), dtype=np.uint8)
-    for idx, frame in enumerate(flow):  
-       bgr[idx] = flow2bgr(frame)
+  for gray in grays:
+    bgr = heatmap(gray)
     bgrs.append(bgr)
-  
+    
   for idx, bgr in enumerate(bgrs):
     fn = files[idx]
     gif_fn = fn.split(".")[0] + ".gif"
     with imageio.get_writer(os.path.join(output_dir, gif_fn), mode='I', duration=1/FPS) as writer:
       for frame in bgr:
         writer.append_data(frame[:, :, ::-1])
-      #write extra one frame to make up for the difference between optical flow and temperature sequences lengths
-      writer.append_data(np.zeros_like(frame))
+
+
+
