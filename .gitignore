@@ -110,4 +110,8 @@ venv.bak/
 tests/tmp/*
 
 .vscode
+<<<<<<< HEAD
 .vs/
+=======
+.vs/
+>>>>>>> 85df6f0bbaaf42139f3e94e442bf7d3c3c3c531b
