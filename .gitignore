@@ -110,3 +110,4 @@ venv.bak/
 tests/tmp/*
 
 .vscode
+.vs/

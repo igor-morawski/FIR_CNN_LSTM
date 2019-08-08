@@ -28,7 +28,7 @@ PAPER_LABELS_REGEX = dict([
     (r'sitdown', 1),
     (r'standup', 2),
     (r'falling.*', 3),
-    (r'^(sit|lie|stand)$', 4),
+    (r'^(sit|lie|stand)', 4),
 ])
 
 
