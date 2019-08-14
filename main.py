@@ -243,6 +243,9 @@ if __name__ == "__main__":
 
     # LOOCV
     for actor in dataset.ACTORS:
+        if actor != 'human9':
+            print("Skip")
+            continue
         testing_actor = actor
         training_actors = list(dataset.ACTORS)
         training_actors.remove(testing_actor)
@@ -323,7 +326,7 @@ if __name__ == "__main__":
         model.summary()
 
         # ! later change to val_los!! amd add to model.fig_generator
-        early_stopping = EarlyStopping(monitor='loss', patience=50, verbose=1)
+        early_stopping = EarlyStopping(monitor='loss', patience=20, verbose=1)
         terminateNaN = TerminateOnNaN()
         history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=[early_stopping, terminateNaN])
         plot_history(history, FLAGS.model_dir)
@@ -342,11 +345,14 @@ if __name__ == "__main__":
         y_pred = np.argmax(predictions, axis=-1)
         y_test = np.argmax(testing_batches[0][1], axis=-1)
         cnfs_mtx = confusion_matrix(y_test, y_pred)
+        predictions = model.predict_generator(validation_batches)
+        y_pred = np.argmax(predictions, axis=-1)
+        y_test = np.argmax(testing_batches[0][1], axis=-1)
+        cnfs_mtx = confusion_matrix(y_test, y_pred)
         clear_session()
         break
 
-'''
-manual testing
+# manual testing
 # load json and create model
 json_file = open(model_fn_json, 'r')
 loaded_model_json = json_file.read()
@@ -365,7 +371,7 @@ stand = np.load(r"D:\tmps\cache\temperature\human1\stand_20170203_p3_light3_186_
 
 predictions = []
 for action in [walk, sitdown, standup, falling, sit, lie, stand]:
-    predictions.append(model.predict([action[np.newaxis], np.random.rand(np.prod([*action.shape[:-1], 2])).reshape([*action.shape[:-1], 2])[np.newaxis]]))
+    predictions.append(loaded_model.predict([action[np.newaxis], np.random.rand(np.prod([*action.shape[:-1], 2])).reshape([*action.shape[:-1], 2])[np.newaxis]]))
 
 for action in predictions:
     print(action.argmax())
@@ -379,4 +385,3 @@ def __pad_to_length(sequence, length):
     return np.vstack([sequence, trailing])
 
 a = __pad_to_length(falling, 30)
-'''
