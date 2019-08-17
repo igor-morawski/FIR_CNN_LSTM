@@ -54,13 +54,11 @@ def build_model(model_dir, optimizer="adam"):
     spatial_dense2 = TimeDistributed(Dense(256))(spatial_dense1)
     spatial_LSTM = LSTM(CLASSES_N, return_sequences=True, activation='softmax')(spatial_dense2)
     spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM)
-    
     #handle numerical instability
     output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_global_pool)
 
     model=Model([spatial_input, temporal_input], output)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    #model.compile(loss=tensorflow.losses.sigmoid_cross_entropy, optimizer=optimizer, metrics=['accuracy'])
 
     prepare.ensure_dir_exists(model_dir)
     keras.utils.plot_model(model, os.path.join(model_dir, 'model.png'))
@@ -101,7 +99,10 @@ class DataGenerator(keras.utils.Sequence):
     '''
     def __init__(self, data, batch_size, shuffle: bool = True):
         self.data = data
-        self.batch_size = batch_size
+        if (batch_size == -1):
+            self.batch_size = len(data)
+        else:
+            self.batch_size = batch_size
         self.shuffle = shuffle
         if self.shuffle:
             random.shuffle(self.data)
@@ -192,10 +193,18 @@ if __name__ == "__main__":
             to include in the validation split.')
     # ! ADD: {}_batch_size for [train, validation, test]
     # ! ADD: {} -1 for batch_size = sample_num
-    parser.add_argument('--batch_size',
+    parser.add_argument('--training_batch_size',
                         type=int,
                         default=100,
                         help='How many images to train on at a time.')
+    parser.add_argument('--validation_batch_size',
+                        type=int,
+                        default=-1,
+                        help='How many images to validate on at a time. -1 for batch_size = samples_n (more stable results).')
+    parser.add_argument('--testing_batch_size',
+                        type=int,
+                        default=-1,
+                        help='How many images to test on at a time. -1 for batch_size = samples_n (more stable results).')
     parser.add_argument("--download",
                         action="store_true",
                         help='Download the dataset.')
@@ -304,13 +313,13 @@ if __name__ == "__main__":
                                        FLAGS.flow_dir)
 
         training_batches = DataGenerator(training_data,
-                                       FLAGS.batch_size,
+                                       FLAGS.training_batch_size,
                                        shuffle=True)
         validation_batches = DataGenerator(validation_data,
-                                         FLAGS.batch_size,
+                                         FLAGS.validation_batch_size,
                                          shuffle=True)
         testing_batches = DataGenerator(testing_data,
-                                      len(testing_data),
+                                      FLAGS.testing_batch_size,
                                       shuffle=False)
 
         print("[INFO] \n")
@@ -332,7 +341,6 @@ if __name__ == "__main__":
         plot_history(history, FLAGS.model_dir)
         # ! test the model
         # ! tensorboard
-        # ! saving is wrong
         json_string = model.to_json()
         model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
         model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model.hdf5")
@@ -342,10 +350,6 @@ if __name__ == "__main__":
         print('Test loss:', test[0])
         print('Test accuracy:', test[1])
         predictions = model.predict_generator(testing_batches)
-        y_pred = np.argmax(predictions, axis=-1)
-        y_test = np.argmax(testing_batches[0][1], axis=-1)
-        cnfs_mtx = confusion_matrix(y_test, y_pred)
-        predictions = model.predict_generator(validation_batches)
         y_pred = np.argmax(predictions, axis=-1)
         y_test = np.argmax(testing_batches[0][1], axis=-1)
         cnfs_mtx = confusion_matrix(y_test, y_pred)
