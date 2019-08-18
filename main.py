@@ -14,18 +14,19 @@ random.seed(a=SEED)
 
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 import tensorflow
 from tensorflow import keras
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, TimeDistributed, Dense, Dropout, Flatten, \
-    Activation, Conv2D, MaxPooling2D, LSTM, GlobalAveragePooling1D, average, \
-    BatchNormalization, Masking, multiply, GlobalMaxPooling1D, Reshape, Lambda, GRU
+from tensorflow.keras.layers import Input, TimeDistributed, Dense, Dropout,\
+    Flatten, Activation, Conv2D, MaxPooling2D, LSTM, GlobalAveragePooling1D,\
+    BatchNormalization, Masking, multiply, GlobalMaxPooling1D, Reshape,\
+    GRU, average, Lambda
 
 from tensorflow.keras.backend import clear_session
 from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN
+from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN, ModelCheckpoint
 
 # LABELS_REGEX = dataset.LABELS_REGEX
 LABELS_REGEX = dataset.PAPER_LABELS_REGEX
@@ -40,6 +41,7 @@ def build_model(model_dir, optimizer="adam"):
     spatial_input = Input(shape=(None, 16, 16, 1))
     temporal_input = Input(shape=(None, 16, 16, 2))
 
+    #spatial stream
     spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(spatial_input)
     spatial_bn_layer = TimeDistributed(BatchNormalization())(spatial_conv1)
     spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(spatial_bn_layer)
@@ -52,11 +54,34 @@ def build_model(model_dir, optimizer="adam"):
     spatial_flattened = TimeDistributed(Flatten())(spatial_maxpool4)
     spatial_dense1 = TimeDistributed(Dense(512))(spatial_flattened)
     spatial_dense2 = TimeDistributed(Dense(256))(spatial_dense1)
-    spatial_LSTM = LSTM(CLASSES_N, return_sequences=True, activation='softmax')(spatial_dense2)
-    spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM)
+    spatial_LSTM = LSTM(CLASSES_N, return_sequences=False, activation='softmax')(spatial_dense2)
+    #spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM)
+    spatial_global_pool = spatial_LSTM
     #handle numerical instability
-    output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_global_pool)
+    spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_global_pool)
 
+    #temporal stream
+    temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(temporal_input)
+    temporal_bn_layer = TimeDistributed(BatchNormalization())(temporal_conv1)
+    temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_bn_layer)
+    temporal_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu'))(temporal_maxpool1)
+    temporal_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv2)
+    temporal_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu'))(temporal_maxpool2)
+    temporal_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv3)
+    temporal_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu'))(temporal_maxpool3)
+    temporal_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv4)
+    temporal_flattened = TimeDistributed(Flatten())(temporal_maxpool4)
+    temporal_dense1 = TimeDistributed(Dense(512))(temporal_flattened)
+    temporal_dense2 = TimeDistributed(Dense(256))(temporal_dense1)
+    temporal_LSTM = GRU(CLASSES_N, return_sequences=True, activation='softmax')(temporal_dense2)
+    temporal_LSTM2 = GRU(CLASSES_N, return_sequences=False, activation='softmax')(temporal_LSTM)
+    #temporal_global_pool = GlobalAveragePooling1D()(temporal_LSTM2)
+    #handle numerical instability
+    temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_LSTM2)
+
+    #merging
+    output = temporal_output
+    #compiling
     model=Model([spatial_input, temporal_input], output)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
@@ -239,6 +264,9 @@ if __name__ == "__main__":
     if (FLAGS.validation_size > 1) or (FLAGS.validation_size < 0):
         raise ValueError("Validation size should be between 0.0 and 1.0")
 
+    model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
+    model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model.hdf5")
+
     # relative_path, y = data_fn_y[i]
     data_fn_y = []
     for path in temperature_files:
@@ -252,7 +280,7 @@ if __name__ == "__main__":
 
     # LOOCV
     for actor in dataset.ACTORS:
-        if actor != 'human9':
+        if actor != 'human2':
             print("Skip")
             continue
         testing_actor = actor
@@ -330,22 +358,20 @@ if __name__ == "__main__":
         print("Testing: {} samples -> {} batches".format(
             len(testing_data), len(testing_batches)))
         
-        optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5)
+        #optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.2)
+        optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
         model = build_model(FLAGS.model_dir, optimizer)
+        json_string = model.to_json()
+        open(model_fn_json, 'w').write(json_string)
         model.summary()
 
         # ! later change to val_los!! amd add to model.fig_generator
         early_stopping = EarlyStopping(monitor='loss', patience=20, verbose=1)
+        #that shouldn't happen anymore! (NaN)
         terminateNaN = TerminateOnNaN()
-        history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=[early_stopping, terminateNaN])
+        saveBest = ModelCheckpoint(model_fn_hdf5, save_best_only=True)
+        history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=[early_stopping, terminateNaN, saveBest])
         plot_history(history, FLAGS.model_dir)
-        # ! test the model
-        # ! tensorboard
-        json_string = model.to_json()
-        model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
-        model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model.hdf5")
-        open(model_fn_json, 'w').write(json_string)
-        model.save_weights(model_fn_hdf5)
         test = model.evaluate_generator(testing_batches)
         print('Test loss:', test[0])
         print('Test accuracy:', test[1])
@@ -356,6 +382,7 @@ if __name__ == "__main__":
         clear_session()
         break
 
+'''
 # manual testing
 # load json and create model
 json_file = open(model_fn_json, 'r')
@@ -365,6 +392,13 @@ loaded_model = tensorflow.keras.models.model_from_json(loaded_model_json)
 # load weights into new model
 loaded_model.load_weights(model_fn_hdf5)
 print("Loaded model from disk")
+
+predictions = model.predict_generator(testing_batches)
+y_pred = np.argmax(predictions, axis=-1)
+y_test = np.argmax(testing_batches[0][1], axis=-1)
+cnfs_mtx = confusion_matrix(y_test, y_pred)
+print(accuracy_score(y_test, y_pred))
+
 walk = np.load(r"D:\tmps\cache\temperature\human1\walk_20170203_p5_dark1_126_142.npy")[..., np.newaxis]
 sitdown = np.load(r"D:\tmps\cache\temperature\human1\sitdown_20170203_p6_dark2_128_148.npy")[..., np.newaxis]
 standup = np.load(r"D:\tmps\cache\temperature\human1\standup_20170203_p8_light2_169_197.npy")[..., np.newaxis]
@@ -372,7 +406,6 @@ falling = np.load(r"D:\tmps\cache\temperature\human1\falling1_20170203_p14_light
 sit = np.load(r"D:\tmps\cache\temperature\human1\sit_20170203_p1_dark3_197_208.npy")[..., np.newaxis]
 lie = np.load(r"D:\tmps\cache\temperature\human1\lie_20170203_p3_light4_175_199.npy")[..., np.newaxis]
 stand = np.load(r"D:\tmps\cache\temperature\human1\stand_20170203_p3_light3_186_209.npy")[..., np.newaxis]
-
 predictions = []
 for action in [walk, sitdown, standup, falling, sit, lie, stand]:
     predictions.append(loaded_model.predict([action[np.newaxis], np.random.rand(np.prod([*action.shape[:-1], 2])).reshape([*action.shape[:-1], 2])[np.newaxis]]))
@@ -389,3 +422,4 @@ def __pad_to_length(sequence, length):
     return np.vstack([sequence, trailing])
 
 a = __pad_to_length(falling, 30)
+'''
