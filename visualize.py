@@ -176,8 +176,9 @@ if __name__ == "__main__":
   visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean)
   visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean)
 
-  visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
-  visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
+  if FLAGS.augmentation:
+    visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
+    visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
 
-  visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
-  visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
+    visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
+    visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
