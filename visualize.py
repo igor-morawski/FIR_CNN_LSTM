@@ -18,10 +18,12 @@ import cv2
 
 import imageio
 
+from tools import augmentation as augment
+
 
 FPS = 10
 
-def visualize_temperature(visualize_dir, temperature_dir, files_list, clean):  
+def visualize_temperature(visualize_dir, temperature_dir, files_list, clean, augment_fct = None, suffix = ""):  
   output_dir = os.path.join(visualize_dir, os.path.split(temperature_dir)[1])
   if clean:
     prepare.remove_dir_tree(output_dir)
@@ -49,6 +51,8 @@ def visualize_temperature(visualize_dir, temperature_dir, files_list, clean):
   for name in files:
     fn = glob(os.path.join(temperature_dir,"**",name))[0]
     temperature = np.load(fn)
+    if augment_fct:
+      temperature = augment_fct(temperature)
     temperatures.append(temperature)
 
   grays = []
@@ -68,12 +72,12 @@ def visualize_temperature(visualize_dir, temperature_dir, files_list, clean):
     
   for idx, bgr in enumerate(bgrs):
     fn = files[idx]
-    gif_fn = fn.split(".")[0] + ".gif"
+    gif_fn = fn.split(".")[0] + suffix + ".gif"
     with imageio.get_writer(os.path.join(output_dir, gif_fn), mode='I', duration=1/FPS) as writer:
       for frame in bgr:
         writer.append_data(frame[:, :, ::-1])
 
-def visualize_flow(visualize_dir, flow_dir, files_list, clean):
+def visualize_flow(visualize_dir, flow_dir, files_list, clean, augment_fct = None, suffix = ""):
     
   output_dir = os.path.join(visualize_dir, os.path.split(flow_dir)[1])
   if clean:
@@ -102,6 +106,8 @@ def visualize_flow(visualize_dir, flow_dir, files_list, clean):
   for name in files:
     fn = glob(os.path.join(flow_dir,"**",name))[0]
     flow = np.load(fn)
+    if augment_fct:
+      flow = augment_fct(flow)
     flows.append(flow)
 
   def flow2bgr(flow_frame):
@@ -123,7 +129,7 @@ def visualize_flow(visualize_dir, flow_dir, files_list, clean):
   
   for idx, bgr in enumerate(bgrs):
     fn = files[idx]
-    gif_fn = fn.split(".")[0] + ".gif"
+    gif_fn = fn.split(".")[0] + suffix + ".gif"
     with imageio.get_writer(os.path.join(output_dir, gif_fn), mode='I', duration=1/FPS) as writer:
       for frame in bgr:
         writer.append_data(frame[:, :, ::-1])
@@ -169,3 +175,9 @@ if __name__ == "__main__":
   FLAGS, unparsed = parser.parse_known_args()
   visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean)
   visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean)
+
+  visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
+  visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_rotation, suffix="rot")
+
+  visualize_temperature(FLAGS.visualize_dir, FLAGS.temperature_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
+  visualize_flow(FLAGS.visualize_dir, FLAGS.flow_dir, FLAGS.files_list, FLAGS.clean, augment_fct=augment.random_flip, suffix="flip")
