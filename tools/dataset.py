@@ -40,7 +40,6 @@ LABELS_REGEX = dict([
     (r'sit', 4),
     (r'lie', 5),
     (r'stand', 6),
-
 ])
 
 RAW_LABELS = ('walk', 'walk1', 'walk2',

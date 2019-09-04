@@ -63,7 +63,7 @@ def optical_flow(dataset, flow_dir):
             stop += 1
             fn = label + "_" + name + "_" + str(start) + "_" + str(stop) + ".npy"
             path = os.path.join(flow_dir, actor, fn)
-            unit = sample.as_uint8()[start:stop]
+            unit = sample[start:stop]
             flow_array = flow.farneback(unit)
             with open(path, 'wb+') as handler:
                 np.save(handler, flow_array, allow_pickle=False)
