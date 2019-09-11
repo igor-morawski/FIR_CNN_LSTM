@@ -21,7 +21,7 @@ import tensorflow
 from tensorflow import keras
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, TimeDistributed, Dense, Dropout,\
-    Flatten, Activation, Conv2D, MaxPooling2D, LSTM, GlobalAveragePooling1D,\
+    Flatten, Activation, Conv2D, MaxPooling2D, GlobalAveragePooling1D,\
     BatchNormalization, Masking, multiply, GlobalMaxPooling1D, Reshape,\
     GRU, average, Lambda, Average, Maximum, Concatenate
 
@@ -56,11 +56,11 @@ def build_model(model_dir, optimizer="adam"):
     spatial_flattened = TimeDistributed(Flatten())(spatial_maxpool4)
     spatial_dense1 = TimeDistributed(Dense(512))(spatial_flattened)
     spatial_dense2 = TimeDistributed(Dense(256))(spatial_dense1)
-    spatial_LSTM = GRU(100, return_sequences=True)(spatial_dense2)
-    spatial_LSTM2 = GRU(100,  return_sequences=False)(spatial_LSTM)
+    spatial_GRU = GRU(100, return_sequences=True)(spatial_dense2)
+    spatial_GRU2 = GRU(100,  return_sequences=False)(spatial_GRU)
 
     #handle numerical instability
-    spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_LSTM2)
+    spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_GRU2)
 
     #temporal stream
     temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(temporal_input)
@@ -75,12 +75,12 @@ def build_model(model_dir, optimizer="adam"):
     temporal_flattened = TimeDistributed(Flatten())(temporal_maxpool4)
     temporal_dense1 = TimeDistributed(Dense(512))(temporal_flattened)
     temporal_dense2 = TimeDistributed(Dense(256))(temporal_dense1)
-    temporal_LSTM = GRU(100, return_sequences=True)(temporal_dense2)
-    temporal_LSTM2 = GRU(100, return_sequences=False )(temporal_LSTM)
+    temporal_GRU = GRU(100, return_sequences=True)(temporal_dense2)
+    temporal_GRU2 = GRU(100, return_sequences=False )(temporal_GRU)
 
-    # temporal_global_pool = GlobalAveragePooling1D()(temporal_LSTM2)
+    # temporal_global_pool = GlobalAveragePooling1D()(temporal_GRU2)
     #handle numerical instability
-    temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_LSTM2)
+    temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_GRU2)
 
     #merging
     concat = Concatenate()([spatial_output, temporal_output])
@@ -223,7 +223,7 @@ if __name__ == "__main__":
                         help='How many epochs to run before ending.')
     parser.add_argument('--learning_rate',
                         type=float,
-                        default=1e-5,
+                        default=1e-1,
                         help='How large a learning rate to use when training.')
     parser.add_argument(
         '--validation_size',
