@@ -59,8 +59,6 @@ def build_model(model_dir, optimizer="adam"):
     spatial_LSTM = GRU(100, return_sequences=True)(spatial_dense2)
     spatial_LSTM2 = GRU(100,  return_sequences=False)(spatial_LSTM)
 
-    # spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM2)
-    #spatial_global_pool = spatial_LSTM
     #handle numerical instability
     spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_LSTM2)
 
