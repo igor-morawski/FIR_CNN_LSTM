@@ -14,4 +14,4 @@ Accuracy (LOOCV): 96.98%
 
 To do:
 
-- [ ] 
+- [ ] more augmentation methods: shifting
