@@ -1,7 +1,20 @@
 # FIR_CNN_LSTM
 CNN-LSTM model for exteremely low-resolution FIR sequences 
 
+Accuracy (LOOCV): 96.98%
+
+|           | walk | sitdown | standup | falling | no action |
+|:---------:|:----:|:-------:|:-------:|:-------:|:---------:|
+|    **walk**   |  349 |    6    |    4    |    0    |      1    |
+|   **sitdown** |   3  |   327   |    10   |    3    |     17    |
+|  **standup**  |   2  |    3    |   343   |    0    |     12    |
+|  **falling**  |   2  |    4    |    0    |   353   |     1     |
+| **no action** |   4  |    4    |    0    |    0    |    1072   |
+
+
 To do:
 
-- [ ] dataset generator
-- [ ] CNN/LSTM model
+- [ ] more augmentation methods: shifting
+- [ ] check out cosine loss
+- [ ] pretraining
+- [ ] train the streams separately
