@@ -44,47 +44,46 @@ def build_model(model_dir, optimizer="adam"):
     temporal_input = Input(shape=(None, 16, 16, 2))
 
     #spatial stream
-    spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(spatial_input)
-    spatial_bn_layer = TimeDistributed(BatchNormalization())(spatial_conv1)
-    spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(spatial_bn_layer)
-    spatial_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu'))(spatial_maxpool1)
-    spatial_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(spatial_conv2)
-    spatial_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu'))(spatial_maxpool2)
-    spatial_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(spatial_conv3)
-    spatial_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu'))(spatial_maxpool3)
-    spatial_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(spatial_conv4)
-    spatial_flattened = TimeDistributed(Flatten())(spatial_maxpool4)
-    spatial_dense1 = TimeDistributed(Dense(512))(spatial_flattened)
-    spatial_dense2 = TimeDistributed(Dense(256))(spatial_dense1)
-    spatial_GRU = GRU(100, return_sequences=True)(spatial_dense2)
-    spatial_GRU2 = GRU(100,  return_sequences=False)(spatial_GRU)
+    spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='spatial_conv1'))(spatial_input)
+    spatial_bn_layer = TimeDistributed(BatchNormalization(name='spatial_bn_layer'))(spatial_conv1)
+    spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool1'))(spatial_bn_layer)
+    spatial_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='spatial_conv2'))(spatial_maxpool1)
+    spatial_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool2'))(spatial_conv2)
+    spatial_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='spatial_conv3'))(spatial_maxpool2)
+    spatial_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool3'))(spatial_conv3)
+    spatial_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='spatial_conv4'))(spatial_maxpool3)
+    spatial_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool4'))(spatial_conv4)
+    spatial_flattened = TimeDistributed(Flatten(name='spatial_flattened'))(spatial_maxpool4)
+    spatial_dense1 = TimeDistributed(Dense(512, name='spatial_dense1'))(spatial_flattened)
+    spatial_dense2 = TimeDistributed(Dense(256, name='spatial_dense2'))(spatial_dense1)
+    spatial_GRU = GRU(100, return_sequences=True, name='spatial_GRU')(spatial_dense2)
+    spatial_GRU2 = GRU(100,  return_sequences=False, name='spatial_GRU2')(spatial_GRU)
 
     #handle numerical instability
     spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_GRU2)
 
     #temporal stream
-    temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(temporal_input)
-    temporal_bn_layer = TimeDistributed(BatchNormalization())(temporal_conv1)
-    temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_bn_layer)
-    temporal_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu'))(temporal_maxpool1)
-    temporal_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv2)
-    temporal_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu'))(temporal_maxpool2)
-    temporal_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv3)
-    temporal_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu'))(temporal_maxpool3)
-    temporal_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))(temporal_conv4)
-    temporal_flattened = TimeDistributed(Flatten())(temporal_maxpool4)
-    temporal_dense1 = TimeDistributed(Dense(512))(temporal_flattened)
-    temporal_dense2 = TimeDistributed(Dense(256))(temporal_dense1)
-    temporal_GRU = GRU(100, return_sequences=True)(temporal_dense2)
-    temporal_GRU2 = GRU(100, return_sequences=False )(temporal_GRU)
+    temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='temporal_conv1'))(temporal_input)
+    temporal_bn_layer = TimeDistributed(BatchNormalization(name='temporal_bn_layer'))(temporal_conv1)
+    temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool1'))(temporal_bn_layer)
+    temporal_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='temporal_conv2'))(temporal_maxpool1)
+    temporal_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool2'))(temporal_conv2)
+    temporal_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='temporal_conv3'))(temporal_maxpool2)
+    temporal_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool3'))(temporal_conv3)
+    temporal_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='temporal_conv4'))(temporal_maxpool3)
+    temporal_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool4'))(temporal_conv4)
+    temporal_flattened = TimeDistributed(Flatten(name='temporal_flattened'))(temporal_maxpool4)
+    temporal_dense1 = TimeDistributed(Dense(512, name='temporal_dense1'))(temporal_flattened)
+    temporal_dense2 = TimeDistributed(Dense(256, name='temporal_dense2'))(temporal_dense1)
+    temporal_GRU = GRU(100, return_sequences=True, name='temporal_GRU')(temporal_dense2)
+    temporal_GRU2 = GRU(100, return_sequences=False, name='temporal_GRU2')(temporal_GRU)
 
-    # temporal_global_pool = GlobalAveragePooling1D()(temporal_GRU2)
     #handle numerical instability
     temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_GRU2)
 
     #merging
-    concat = Concatenate()([spatial_output, temporal_output])
-    output = Dense(CLASSES_N, activation="softmax")(concat)
+    concat = Concatenate(name='concat')([spatial_output, temporal_output])
+    output = Dense(CLASSES_N, activation="softmax", name='output')(concat)
     #compiling
     model=Model([spatial_input, temporal_input], output)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
@@ -374,7 +373,6 @@ if __name__ == "__main__":
         print("Testing: {} samples -> {} batches".format(
             len(testing_data), len(testing_batches)))
             
-        #optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.2)
         optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
         model = build_model(FLAGS.model_dir, optimizer)
         json_string = model.to_json()
@@ -420,39 +418,3 @@ if __name__ == "__main__":
     metrics["accuracy"] = cross_validation_accuracy
     np.save(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), metrics)
     # metrics = np.load(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), allow_pickle=True)[()]
-
-
-
-
-'''
-# manual testing
-
-walk =r"human1\walk_20170203_p5_dark1_126_142.npy"
-sitdown = r"human1\sitdown_20170203_p6_dark2_128_148.npy"
-standup = r"human1\standup_20170203_p8_light2_169_197.npy"
-falling = r"human1\falling1_20170203_p14_light1_104_125.npy"
-sit = r"human1\sit_20170203_p1_dark3_197_208.npy"
-lie = r"human1\lie_20170203_p3_light4_175_199.npy"
-stand = r"human1\stand_20170203_p3_light3_186_209.npy"
-predictions = []
-for action in [walk, sitdown, standup, falling, sit, lie, stand]:
-    temp = np.load(os.path.join(FLAGS.temperature_dir, action))
-    temp = temp[..., np.newaxis]
-    temp = temp.reshape([-1, *temp.shape])
-    flow = np.load(os.path.join(FLAGS.flow_dir, action))
-    flow = flow.reshape([-1, *flow.shape])
-    predictions.append(loaded_model.predict([temp, flow]))
-
-for action in predictions:
-    print(action.argmax())
-
-
-def __pad_to_length(sequence, length):
-    if sequence.shape[0] == length:
-        return sequence
-    trailing = np.zeros([length - sequence.shape[0], *sequence.shape[1:]],
-                        sequence.dtype)
-    return np.vstack([sequence, trailing])
-
-a = __pad_to_length(falling, 30)
-'''
