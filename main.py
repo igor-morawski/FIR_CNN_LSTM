@@ -1,6 +1,7 @@
 from tools import dataset
 from tools.dataset import Dataset
 from tools import prepare
+from tools import augmentation as augment
 
 import os
 import argparse
@@ -22,14 +23,15 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, TimeDistributed, Dense, Dropout,\
     Flatten, Activation, Conv2D, MaxPooling2D, LSTM, GlobalAveragePooling1D,\
     BatchNormalization, Masking, multiply, GlobalMaxPooling1D, Reshape,\
-    GRU, average, Lambda
+    GRU, average, Lambda, Average, Maximum, Concatenate
 
+from tools.flow import farneback
 from tensorflow.keras.backend import clear_session
 from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN, ModelCheckpoint, ReduceLROnPlateau
 
-# LABELS_REGEX = dataset.LABELS_REGEX
-LABELS_REGEX = dataset.PAPER_LABELS_REGEX
+# LABELS_REGEX = dataset.LABELS_REGEX #7 labels
+LABELS_REGEX = dataset.PAPER_LABELS_REGEX #5 labels
 CLASSES_N = len(LABELS_REGEX)
 
 KERAS_EPSILON = tensorflow.keras.backend.epsilon()
@@ -54,11 +56,13 @@ def build_model(model_dir, optimizer="adam"):
     spatial_flattened = TimeDistributed(Flatten())(spatial_maxpool4)
     spatial_dense1 = TimeDistributed(Dense(512))(spatial_flattened)
     spatial_dense2 = TimeDistributed(Dense(256))(spatial_dense1)
-    spatial_LSTM = LSTM(CLASSES_N, return_sequences=False, activation='softmax')(spatial_dense2)
-    #spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM)
-    spatial_global_pool = spatial_LSTM
+    spatial_LSTM = GRU(100, return_sequences=True)(spatial_dense2)
+    spatial_LSTM2 = GRU(100,  return_sequences=False)(spatial_LSTM)
+
+    # spatial_global_pool = GlobalAveragePooling1D()(spatial_LSTM2)
+    #spatial_global_pool = spatial_LSTM
     #handle numerical instability
-    spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_global_pool)
+    spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_LSTM2)
 
     #temporal stream
     temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu'))(temporal_input)
@@ -73,14 +77,16 @@ def build_model(model_dir, optimizer="adam"):
     temporal_flattened = TimeDistributed(Flatten())(temporal_maxpool4)
     temporal_dense1 = TimeDistributed(Dense(512))(temporal_flattened)
     temporal_dense2 = TimeDistributed(Dense(256))(temporal_dense1)
-    temporal_LSTM = GRU(CLASSES_N, return_sequences=True, activation='softmax')(temporal_dense2)
-    temporal_LSTM2 = GRU(CLASSES_N, return_sequences=False, activation='softmax')(temporal_LSTM)
-    #temporal_global_pool = GlobalAveragePooling1D()(temporal_LSTM2)
+    temporal_LSTM = GRU(100, return_sequences=True)(temporal_dense2)
+    temporal_LSTM2 = GRU(100, return_sequences=False )(temporal_LSTM)
+
+    # temporal_global_pool = GlobalAveragePooling1D()(temporal_LSTM2)
     #handle numerical instability
     temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_LSTM2)
 
     #merging
-    output = temporal_output
+    concat = Concatenate()([spatial_output, temporal_output])
+    output = Dense(CLASSES_N, activation="softmax")(concat)
     #compiling
     model=Model([spatial_input, temporal_input], output)
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
@@ -122,7 +128,7 @@ class DataGenerator(keras.utils.Sequence):
         list of [fn, y] where fn is file location and y is a label
 
     '''
-    def __init__(self, data, batch_size, shuffle: bool = True):
+    def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
         self.data = data
         if (batch_size == -1):
             self.batch_size = len(data)
@@ -131,6 +137,7 @@ class DataGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         if self.shuffle:
             random.shuffle(self.data)
+        self.augmentation = augmentation
 
     def __len__(self):
         return int(np.floor(len(self.data) / self.batch_size))
@@ -149,10 +156,20 @@ class DataGenerator(keras.utils.Sequence):
         temperature_length_max = 0
         flow_length_max = 0
         for idx in indices:
+            if self.augmentation:
+                k_rot = np.random.randint(0, 4)
+                k_flip = np.random.randint(0, 3)
             [temperature_fn, flow_fn], y = self.data[idx]
             temperature = np.load(temperature_fn).astype(np.float32)
+            if self.augmentation:
+                temperature = augment.random_rotation(temperature, case=k_rot)
+                temperature = augment.random_flip(temperature, case=k_flip)
             temperature = temperature[..., np.newaxis]
             flow = np.load(flow_fn)
+            if self.augmentation:
+                flow = farneback(np.squeeze(temperature))
+                #flow = augment.random_rotation(flow, case=k_rot)
+                #flow = augment.random_flip(flow, case=k_flip)
             if temperature.shape[0] > temperature_length_max:
                 temperature_length_max = temperature.shape[0]
             if flow.shape[0] > flow_length_max:
@@ -216,11 +233,9 @@ if __name__ == "__main__":
         default=0.1,
         help='Between 0.0 and 1.0, the proportion of the dataset \
             to include in the validation split.')
-    # ! ADD: {}_batch_size for [train, validation, test]
-    # ! ADD: {} -1 for batch_size = sample_num
     parser.add_argument('--training_batch_size',
                         type=int,
-                        default=100,
+                        default=128,
                         help='How many images to train on at a time.')
     parser.add_argument('--validation_batch_size',
                         type=int,
@@ -236,6 +251,10 @@ if __name__ == "__main__":
     parser.add_argument("--prepare",
                         action="store_true",
                         help='Prepare the dataset.')
+    parser.add_argument("--testing_actor",
+                        type=str,
+                        default=None,
+                        help='Choose testing actor, pattern: "human{}" [0-9]. Otherwise full cross validation is performed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.download:
@@ -264,9 +283,6 @@ if __name__ == "__main__":
     if (FLAGS.validation_size > 1) or (FLAGS.validation_size < 0):
         raise ValueError("Validation size should be between 0.0 and 1.0")
 
-    model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
-    model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model.hdf5")
-
     # relative_path, y = data_fn_y[i]
     data_fn_y = []
     for path in temperature_files:
@@ -278,14 +294,21 @@ if __name__ == "__main__":
                 y = LABELS_REGEX[pattern]
         data_fn_y.append([relative_path, y])
 
+    cnfs_mtx_dict = dict()
+        
     # LOOCV
     for actor in dataset.ACTORS:
-        if actor != 'human2':
-            print("Skip")
-            continue
+        if FLAGS.testing_actor:
+            if actor != FLAGS.testing_actor:
+                print("Skip")
+                continue
+
         testing_actor = actor
         training_actors = list(dataset.ACTORS)
         training_actors.remove(testing_actor)
+
+        model_fn_json = os.path.join(FLAGS.model_dir, "model_{}.json".format(actor))
+        model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model_{}.hdf5".format(actor))
 
         train_val_fns_y = []
         testing_fns_y = []
@@ -296,12 +319,6 @@ if __name__ == "__main__":
                 testing_fns_y.append([fn, y])
             else:
                 train_val_fns_y.append([fn, y])
-
-        '''
-        # regular split
-        split = int(len(training_fns_y) * FLAGS.validation_size)
-        validation_fns_y, training_fns_y = train_val_fns_y[:split], train_val_fns_y[split:]
-        '''
 
         # balanced split
         validation_fns_y, training_fns_y = [], []
@@ -342,7 +359,7 @@ if __name__ == "__main__":
 
         training_batches = DataGenerator(training_data,
                                        FLAGS.training_batch_size,
-                                       shuffle=True)
+                                       shuffle=True, augmentation=True)
         validation_batches = DataGenerator(validation_data,
                                          FLAGS.validation_batch_size,
                                          shuffle=True)
@@ -351,13 +368,14 @@ if __name__ == "__main__":
                                       shuffle=False)
 
         print("[INFO] \n")
+        print("Actor: {}".format(actor))
         print("Training: {} samples -> {} batches".format(
             len(training_data), len(training_batches)))
         print("Validation: {} samples -> {} batches".format(
             len(validation_data), len(validation_batches)))
         print("Testing: {} samples -> {} batches".format(
             len(testing_data), len(testing_batches)))
-        
+            
         #optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.2)
         optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
         model = build_model(FLAGS.model_dir, optimizer)
@@ -365,50 +383,67 @@ if __name__ == "__main__":
         open(model_fn_json, 'w').write(json_string)
         model.summary()
 
-        # ! later change to val_los!! amd add to model.fig_generator
-        early_stopping = EarlyStopping(monitor='loss', patience=20, verbose=1)
-        #that shouldn't happen anymore! (NaN)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
+        # that shouldn't happen
         terminateNaN = TerminateOnNaN()
         saveBest = ModelCheckpoint(model_fn_hdf5, save_best_only=True)
+        #reduceLR = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.001)
         history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=[early_stopping, terminateNaN, saveBest])
         plot_history(history, FLAGS.model_dir)
-        test = model.evaluate_generator(testing_batches)
-        print('Test loss:', test[0])
-        print('Test accuracy:', test[1])
-        predictions = model.predict_generator(testing_batches)
+
+        clear_session()
+        # load json and create model
+        json_file = open(model_fn_json, 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        loaded_model = tensorflow.keras.models.model_from_json(loaded_model_json)
+        # load weights into new model
+        loaded_model.load_weights(model_fn_hdf5)
+        print("Loaded model from disk")
+
+        predictions = loaded_model.predict_generator(testing_batches)
         y_pred = np.argmax(predictions, axis=-1)
         y_test = np.argmax(testing_batches[0][1], axis=-1)
         cnfs_mtx = confusion_matrix(y_test, y_pred)
+        print(accuracy_score(y_test, y_pred))
+        C = cnfs_mtx / cnfs_mtx.astype(np.float).sum(axis=1)
+
+        cnfs_mtx_dict[actor] = cnfs_mtx
+
+        print("[INFO] Model successfully trained, tested on {} ".format(actor))
         clear_session()
-        break
+
+
+    cross_validation_cnfs_mtx = sum(cnfs_mtx_dict[item] for item in cnfs_mtx_dict)
+    cross_validation_accuracy = cross_validation_cnfs_mtx.diagonal().sum()/cross_validation_cnfs_mtx.sum()
+
+    metrics = dict()
+    metrics["confusion_matrix"] = cross_validation_cnfs_mtx
+    metrics["accuracy"] = cross_validation_accuracy
+    np.save(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), metrics)
+    # metrics = np.load(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), allow_pickle=True)[()]
+
+
+
 
 '''
 # manual testing
-# load json and create model
-json_file = open(model_fn_json, 'r')
-loaded_model_json = json_file.read()
-json_file.close()
-loaded_model = tensorflow.keras.models.model_from_json(loaded_model_json)
-# load weights into new model
-loaded_model.load_weights(model_fn_hdf5)
-print("Loaded model from disk")
 
-predictions = model.predict_generator(testing_batches)
-y_pred = np.argmax(predictions, axis=-1)
-y_test = np.argmax(testing_batches[0][1], axis=-1)
-cnfs_mtx = confusion_matrix(y_test, y_pred)
-print(accuracy_score(y_test, y_pred))
-
-walk = np.load(r"D:\tmps\cache\temperature\human1\walk_20170203_p5_dark1_126_142.npy")[..., np.newaxis]
-sitdown = np.load(r"D:\tmps\cache\temperature\human1\sitdown_20170203_p6_dark2_128_148.npy")[..., np.newaxis]
-standup = np.load(r"D:\tmps\cache\temperature\human1\standup_20170203_p8_light2_169_197.npy")[..., np.newaxis]
-falling = np.load(r"D:\tmps\cache\temperature\human1\falling1_20170203_p14_light1_104_125.npy")[..., np.newaxis]
-sit = np.load(r"D:\tmps\cache\temperature\human1\sit_20170203_p1_dark3_197_208.npy")[..., np.newaxis]
-lie = np.load(r"D:\tmps\cache\temperature\human1\lie_20170203_p3_light4_175_199.npy")[..., np.newaxis]
-stand = np.load(r"D:\tmps\cache\temperature\human1\stand_20170203_p3_light3_186_209.npy")[..., np.newaxis]
+walk =r"human1\walk_20170203_p5_dark1_126_142.npy"
+sitdown = r"human1\sitdown_20170203_p6_dark2_128_148.npy"
+standup = r"human1\standup_20170203_p8_light2_169_197.npy"
+falling = r"human1\falling1_20170203_p14_light1_104_125.npy"
+sit = r"human1\sit_20170203_p1_dark3_197_208.npy"
+lie = r"human1\lie_20170203_p3_light4_175_199.npy"
+stand = r"human1\stand_20170203_p3_light3_186_209.npy"
 predictions = []
 for action in [walk, sitdown, standup, falling, sit, lie, stand]:
-    predictions.append(loaded_model.predict([action[np.newaxis], np.random.rand(np.prod([*action.shape[:-1], 2])).reshape([*action.shape[:-1], 2])[np.newaxis]]))
+    temp = np.load(os.path.join(FLAGS.temperature_dir, action))
+    temp = temp[..., np.newaxis]
+    temp = temp.reshape([-1, *temp.shape])
+    flow = np.load(os.path.join(FLAGS.flow_dir, action))
+    flow = flow.reshape([-1, *flow.shape])
+    predictions.append(loaded_model.predict([temp, flow]))
 
 for action in predictions:
     print(action.argmax())
