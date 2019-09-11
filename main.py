@@ -38,12 +38,8 @@ KERAS_EPSILON = tensorflow.keras.backend.epsilon()
 
 keras.backend.set_image_data_format('channels_last')
 
-
-def build_model(model_dir, optimizer="adam"):
+def spatial_stream():
     spatial_input = Input(shape=(None, 16, 16, 1))
-    temporal_input = Input(shape=(None, 16, 16, 2))
-
-    #spatial stream
     spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='spatial_conv1'))(spatial_input)
     spatial_bn_layer = TimeDistributed(BatchNormalization(name='spatial_bn_layer'))(spatial_conv1)
     spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool1'))(spatial_bn_layer)
@@ -58,11 +54,12 @@ def build_model(model_dir, optimizer="adam"):
     spatial_dense2 = TimeDistributed(Dense(256, name='spatial_dense2'))(spatial_dense1)
     spatial_GRU = GRU(100, return_sequences=True, name='spatial_GRU')(spatial_dense2)
     spatial_GRU2 = GRU(100,  return_sequences=False, name='spatial_GRU2')(spatial_GRU)
-
     #handle numerical instability
     spatial_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(spatial_GRU2)
+    return spatial_input, spatial_output
 
-    #temporal stream
+def temporal_stream():
+    temporal_input = Input(shape=(None, 16, 16, 2))
     temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='temporal_conv1'))(temporal_input)
     temporal_bn_layer = TimeDistributed(BatchNormalization(name='temporal_bn_layer'))(temporal_conv1)
     temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool1'))(temporal_bn_layer)
@@ -77,17 +74,18 @@ def build_model(model_dir, optimizer="adam"):
     temporal_dense2 = TimeDistributed(Dense(256, name='temporal_dense2'))(temporal_dense1)
     temporal_GRU = GRU(100, return_sequences=True, name='temporal_GRU')(temporal_dense2)
     temporal_GRU2 = GRU(100, return_sequences=False, name='temporal_GRU2')(temporal_GRU)
-
     #handle numerical instability
     temporal_output = Lambda(lambda x: tensorflow.keras.backend.clip(x, KERAS_EPSILON, 1-KERAS_EPSILON))(temporal_GRU2)
+    return temporal_input, temporal_output
 
-    #merging
-    concat = Concatenate(name='concat')([spatial_output, temporal_output])
-    output = Dense(CLASSES_N, activation="softmax", name='output')(concat)
-    #compiling
+def merge_streams(spatial_input, spatial_output, temporal_input, temporal_output):
+    concat = Concatenate(name='merged_concat')([spatial_output, temporal_output])
+    output = Dense(CLASSES_N, activation="softmax", name='merged_output')(concat)
     model=Model([spatial_input, temporal_input], output)
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    return model
 
+def compile_model(model, model_dir, optimier="adam"):
+    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     prepare.ensure_dir_exists(model_dir)
     keras.utils.plot_model(model, os.path.join(model_dir, 'model.png'))
     return model
@@ -132,6 +130,78 @@ class DataGenerator(keras.utils.Sequence):
         y : numpy array (one-hot encoded)
 
     '''
+    def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
+        self.data = data
+        if (batch_size == -1):
+            self.batch_size = len(data)
+        else:
+            self.batch_size = batch_size
+        self.shuffle = shuffle
+        if self.shuffle:
+            random.shuffle(self.data)
+        self.augmentation = augmentation
+
+    def __len__(self):
+        return int(np.floor(len(self.data) / self.batch_size))
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            random.shuffle(self.data)
+
+    def __getitem__(self, index):
+        indices = list(
+            range(index * self.batch_size, (index + 1) * self.batch_size))
+        return self.__load_data(indices)
+
+    def __load_data(self, indices):
+        samples = []
+        temperature_length_max = 0
+        flow_length_max = 0
+        for idx in indices:
+            if self.augmentation:
+                k_rot = np.random.randint(0, 4)
+                k_flip = np.random.randint(0, 3)
+            [temperature_fn, flow_fn], y = self.data[idx]
+            temperature = np.load(temperature_fn).astype(np.float32)
+            if self.augmentation:
+                temperature = augment.random_rotation(temperature, case=k_rot)
+                temperature = augment.random_flip(temperature, case=k_flip)
+            temperature = temperature[..., np.newaxis]
+            flow = np.load(flow_fn)
+            if self.augmentation:
+                flow = farneback(np.squeeze(temperature))
+                #flow = augment.random_rotation(flow, case=k_rot)
+                #flow = augment.random_flip(flow, case=k_flip)
+            if temperature.shape[0] > temperature_length_max:
+                temperature_length_max = temperature.shape[0]
+            if flow.shape[0] > flow_length_max:
+                flow_length_max = flow.shape[0]
+            samples.append([[temperature, flow], y])
+
+        # zero-pad
+        TEMPERATURE, FLOW = [], []
+        Y = []
+        for sample in samples:
+            [temperature, flow], y = sample
+            temperature = self.__pad_to_length(temperature,
+                                               temperature_length_max)
+            flow = self.__pad_to_length(flow, flow_length_max)
+            TEMPERATURE.append(temperature)
+            FLOW.append(flow)
+            Y.append(y)
+        TEMPERATURE, FLOW, Y = np.array(TEMPERATURE), np.array(FLOW), np.array(
+            Y)
+        return ([TEMPERATURE, FLOW], Y)
+
+    def __pad_to_length(self, sequence, length):
+        if sequence.shape[0] == length:
+            return sequence
+        trailing = np.zeros([length - sequence.shape[0], *sequence.shape[1:]],
+                            sequence.dtype)
+        return np.vstack([trailing, sequence])
+
+
+class TemperatureGenerator(keras.utils.Sequence):
     def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
         self.data = data
         if (batch_size == -1):
@@ -381,7 +451,8 @@ if __name__ == "__main__":
             len(testing_data), len(testing_batches)))
             
         optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
-        model = build_model(FLAGS.model_dir, optimizer)
+        model = compile_model(merge_streams(*spatial_stream(), *temporal_stream()), FLAGS.model_dir, optimizer)
+
         json_string = model.to_json()
         open(model_fn_json, 'w').write(json_string)
         model.summary()
