@@ -121,8 +121,15 @@ class DataGenerator(keras.utils.Sequence):
 
     Parameters
     ----------
-    data: list
+    data : list
         list of [fn, y] where fn is file location and y is a label
+
+    Returns
+    ----------
+    [[temperature, flow], y] : list
+        temperature : numpy array 
+        flow : numpy array
+        y : numpy array (one-hot encoded)
 
     '''
     def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
