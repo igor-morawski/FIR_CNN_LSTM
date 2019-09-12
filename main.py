@@ -89,10 +89,10 @@ def merge_streams(spatial_input, spatial_output, temporal_input, temporal_output
     model = Model([spatial_input, temporal_input], output)
     return model
 
-def compile_model(model, model_dir, optimizer="adam"):
+def compile_model(model, model_dir, optimizer="adam", prefix=""):
     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     prepare.ensure_dir_exists(model_dir)
-    keras.utils.plot_model(model, os.path.join(model_dir, 'model.png'))
+    keras.utils.plot_model(model, os.path.join(model_dir, prefix+'model.png'))
     return model
 
 def plot_history(history, model_dir, prefix=""):
@@ -200,7 +200,6 @@ class DataGenerator(keras.utils.Sequence):
                             sequence.dtype)
         return np.vstack([trailing, sequence])
 
-
 class TemperatureGenerator(keras.utils.Sequence):
     def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
         self.data = data
@@ -259,7 +258,6 @@ class TemperatureGenerator(keras.utils.Sequence):
         trailing = np.zeros([length - sequence.shape[0], *sequence.shape[1:]],
                             sequence.dtype)
         return np.vstack([trailing, sequence])
-
 
 class FlowGenerator(keras.utils.Sequence):
     def __init__(self, data, batch_size, shuffle: bool = True, augmentation: bool = False):
@@ -373,7 +371,7 @@ if __name__ == "__main__":
     parser.add_argument("--prepare",
                         action="store_true",
                         help='Prepare the dataset.')
-    parser.add_argument("--testing_actor",
+    parser.add_argument("--actor",
                         type=str,
                         default=None,
                         help='Choose testing actor, pattern: "human{}" [0-9]. Otherwise full cross validation is performed.')
@@ -423,8 +421,8 @@ if __name__ == "__main__":
         
     # LOOCV
     for actor in dataset.ACTORS:
-        if FLAGS.testing_actor:
-            if actor != FLAGS.testing_actor:
+        if FLAGS.actor:
+            if actor != FLAGS.actor:
                 print("Skip")
                 continue
 
@@ -432,13 +430,12 @@ if __name__ == "__main__":
         training_actors = list(dataset.ACTORS)
         training_actors.remove(testing_actor)
 
-        model_fn_json = os.path.join(FLAGS.model_dir, "model_{}.json".format(actor))
+        model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
         model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model_{}.hdf5".format(actor))
-        spatial_model_fn_json = os.path.join(FLAGS.model_dir, "spatial_model_{}.json".format(actor))
+        spatial_model_fn_json = os.path.join(FLAGS.model_dir, "spatial_model.json")
         spatial_model_fn_hdf5 = os.path.join(FLAGS.model_dir, "spatial_model_{}.hdf5".format(actor))
-        temporal_model_fn_json = os.path.join(FLAGS.model_dir, "temporal_model_{}.json".format(actor))
+        temporal_model_fn_json = os.path.join(FLAGS.model_dir, "temporal_model.json")
         temporal_model_fn_hdf5 = os.path.join(FLAGS.model_dir, "temporal_model_{}.hdf5".format(actor))
-
 
         train_val_fns_y = []
         testing_fns_y = []
@@ -464,7 +461,6 @@ if __name__ == "__main__":
             split = int(len(tmp_class) * FLAGS.validation_size)
             validation_fns_y.extend(tmp_class[:split])
             training_fns_y.extend(tmp_class[split:])
-        
 
         # add back the prefix
         # [temperature_fn, flow_fn], y = *_data
@@ -516,7 +512,7 @@ if __name__ == "__main__":
             plot_history(history, FLAGS.model_dir, prefix)
             return history
 
-        if FLAGS.pretrain is False: 
+        if FLAGS.pretrain: 
             #SPATIAL
             optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
             early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
@@ -532,7 +528,7 @@ if __name__ == "__main__":
             spatial_testing_batches = DataGenerator(testing_data,
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
-            spatial_model = compile_model(stream2model(*spatial_stream()), FLAGS.model_dir, optimizer)
+            spatial_model = compile_model(stream2model(*spatial_stream()), FLAGS.model_dir, optimizer, prefix="spatial_")
             spatial_history = train_model(spatial_model, FLAGS.epochs, spatial_training_batches, spatial_validation_batches, callbacks, spatial_model_fn_json, prefix="spatial_")
         if FLAGS.pretrain: 
             #TEMPORAL
@@ -550,7 +546,7 @@ if __name__ == "__main__":
             temporal_testing_batches = FlowGenerator(testing_data,
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
-            temporal_model = compile_model(stream2model(*temporal_stream()), FLAGS.model_dir, optimizer)
+            temporal_model = compile_model(stream2model(*temporal_stream()), FLAGS.model_dir, optimizer, prefix="temporal_")
             temporal_history = train_model(temporal_model, FLAGS.epochs, temporal_training_batches, temporal_validation_batches, callbacks, temporal_model_fn_json, prefix="temporal_")
 
         clear_session()
@@ -574,7 +570,6 @@ if __name__ == "__main__":
 
         print("[INFO] Model successfully trained, tested on {} ".format(actor))
         clear_session()
-
 
     cross_validation_cnfs_mtx = sum(cnfs_mtx_dict[item] for item in cnfs_mtx_dict)
     cross_validation_accuracy = cross_validation_cnfs_mtx.diagonal().sum()/cross_validation_cnfs_mtx.sum()
