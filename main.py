@@ -40,18 +40,18 @@ keras.backend.set_image_data_format('channels_last')
 
 def spatial_stream():
     spatial_input = Input(shape=(None, 16, 16, 1), name='spatial_input')
-    spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='spatial_conv1'))(spatial_input)
-    spatial_bn_layer = TimeDistributed(BatchNormalization(name='spatial_bn_layer'))(spatial_conv1)
-    spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool1'))(spatial_bn_layer)
-    spatial_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='spatial_conv2'))(spatial_maxpool1)
-    spatial_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool2'))(spatial_conv2)
-    spatial_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='spatial_conv3'))(spatial_maxpool2)
-    spatial_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool3'))(spatial_conv3)
-    spatial_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='spatial_conv4'))(spatial_maxpool3)
-    spatial_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool4'))(spatial_conv4)
-    spatial_flattened = TimeDistributed(Flatten(name='spatial_flattened'))(spatial_maxpool4)
-    spatial_dense1 = TimeDistributed(Dense(512, name='spatial_dense1'))(spatial_flattened)
-    spatial_dense2 = TimeDistributed(Dense(256, name='spatial_dense2'))(spatial_dense1)
+    spatial_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='spatial_conv1'), name='spatial_timedistributed1')(spatial_input)
+    spatial_bn_layer = TimeDistributed(BatchNormalization(name='spatial_bn_layer'), name='spatial_timedistributed2')(spatial_conv1)
+    spatial_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool1'), name='spatial_timedistributed3')(spatial_bn_layer)
+    spatial_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='spatial_conv2'), name='spatial_timedistributed4')(spatial_maxpool1)
+    spatial_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool2'), name='spatial_timedistributed5')(spatial_conv2)
+    spatial_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='spatial_conv3'), name='spatial_timedistributed6')(spatial_maxpool2)
+    spatial_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool3'), name='spatial_timedistributed7')(spatial_conv3)
+    spatial_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='spatial_conv4'), name='spatial_timedistributed8')(spatial_maxpool3)
+    spatial_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='spatial_maxpool4'), name='spatial_timedistributed9')(spatial_conv4)
+    spatial_flattened = TimeDistributed(Flatten(name='spatial_flattened'), name='spatial_timedistributed10')(spatial_maxpool4)
+    spatial_dense1 = TimeDistributed(Dense(512, name='spatial_dense1'), name='spatial_timedistributed11')(spatial_flattened)
+    spatial_dense2 = TimeDistributed(Dense(256, name='spatial_dense2'), name='spatial_timedistributed12')(spatial_dense1)
     spatial_GRU = GRU(100, return_sequences=True, name='spatial_GRU')(spatial_dense2)
     spatial_GRU2 = GRU(100,  return_sequences=False, name='spatial_GRU2')(spatial_GRU)
     #handle numerical instability
@@ -60,18 +60,18 @@ def spatial_stream():
 
 def temporal_stream():
     temporal_input = Input(shape=(None, 16, 16, 2), name='temporal_input')
-    temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='temporal_conv1'))(temporal_input)
-    temporal_bn_layer = TimeDistributed(BatchNormalization(name='temporal_bn_layer'))(temporal_conv1)
-    temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool1'))(temporal_bn_layer)
-    temporal_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='temporal_conv2'))(temporal_maxpool1)
-    temporal_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool2'))(temporal_conv2)
-    temporal_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='temporal_conv3'))(temporal_maxpool2)
-    temporal_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool3'))(temporal_conv3)
-    temporal_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='temporal_conv4'))(temporal_maxpool3)
-    temporal_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool4'))(temporal_conv4)
-    temporal_flattened = TimeDistributed(Flatten(name='temporal_flattened'))(temporal_maxpool4)
-    temporal_dense1 = TimeDistributed(Dense(512, name='temporal_dense1'))(temporal_flattened)
-    temporal_dense2 = TimeDistributed(Dense(256, name='temporal_dense2'))(temporal_dense1)
+    temporal_conv1 = TimeDistributed(Conv2D(16, (3, 3), padding='same', activation='relu', name='temporal_conv1'), name='temporal_timedistributed1')(temporal_input)
+    temporal_bn_layer = TimeDistributed(BatchNormalization(name='temporal_bn_layer'), name='temporal_timedistributed2')(temporal_conv1)
+    temporal_maxpool1 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool1'), name='temporal_timedistributed3')(temporal_bn_layer)
+    temporal_conv2 = TimeDistributed(Conv2D(32, (3, 3), padding='same', activation='relu', name='temporal_conv2'), name='temporal_timedistributed4')(temporal_maxpool1)
+    temporal_maxpool2 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool2'), name='temporal_timedistributed5')(temporal_conv2)
+    temporal_conv3 = TimeDistributed(Conv2D(64, (3, 3), padding='same', activation='relu', name='temporal_conv3'), name='temporal_timedistributed6')(temporal_maxpool2)
+    temporal_maxpool3 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool3'), name='temporal_timedistributed7')(temporal_conv3)
+    temporal_conv4 = TimeDistributed(Conv2D(128, (3, 3), padding='same', activation='relu', name='temporal_conv4'), name='temporal_timedistributed8')(temporal_maxpool3)
+    temporal_maxpool4 = TimeDistributed(MaxPooling2D(pool_size=(2, 2), strides=(2, 2), name='temporal_maxpool4'), name='temporal_timedistributed9')(temporal_conv4)
+    temporal_flattened = TimeDistributed(Flatten(name='temporal_flattened'), name='temporal_timedistributed10')(temporal_maxpool4)
+    temporal_dense1 = TimeDistributed(Dense(512, name='temporal_dense1'), name='temporal_timedistributed11')(temporal_flattened)
+    temporal_dense2 = TimeDistributed(Dense(256, name='temporal_dense2'), name='temporal_timedistributed12')(temporal_dense1)
     temporal_GRU = GRU(100, return_sequences=True, name='temporal_GRU')(temporal_dense2)
     temporal_GRU2 = GRU(100,  return_sequences=False, name='temporal_GRU2')(temporal_GRU)
     #handle numerical instability
@@ -95,14 +95,14 @@ def compile_model(model, model_dir, optimizer="adam", prefix=""):
     keras.utils.plot_model(model, os.path.join(model_dir, prefix+'model.png'))
     return model
 
-def plot_history(history, model_dir, prefix=""):
+def plot_history(history, model_dir, prefix="", suffix=""):
     plt.plot(history.history['acc'])
     plt.plot(history.history['val_acc'])
     plt.title('model accuracy')
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
     plt.legend(['train', 'validation'], loc='upper left')
-    plt.savefig(os.path.join(model_dir, "model_accuracy.png"))
+    plt.savefig(os.path.join(model_dir, prefix+"model_accuracy"+suffix+".png"))
     plt.close()
 
     plt.plot(history.history['loss'])
@@ -111,7 +111,7 @@ def plot_history(history, model_dir, prefix=""):
     plt.ylabel('loss')
     plt.xlabel('epoch')
     plt.legend(['train', 'validation'], loc='upper left')
-    plt.savefig(os.path.join(model_dir, "model_loss.png"))
+    plt.savefig(os.path.join(model_dir, prefix+"model_loss"+suffix+".png"))
     return
 
 def to_categorical(y):
@@ -504,13 +504,24 @@ if __name__ == "__main__":
             
 
 
-        def train_model(model, epochs, training_batches, validation_batches, callbacks, model_fn_json, prefix=""):
+        def train_model(model, epochs, training_batches, validation_batches, callbacks, model_fn_json, prefix="", suffix=""):
             json_string = model.to_json()
             open(model_fn_json, 'w').write(json_string)
             model.summary()
             history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=callbacks)
-            plot_history(history, FLAGS.model_dir, prefix)
+            plot_history(history, FLAGS.model_dir, prefix, suffix)
             return history
+
+        def load_checkpoint(model_fn_json, model_fn_hdf5):
+            # load json and create model
+            json_file = open(model_fn_json, 'r')
+            loaded_model_json = json_file.read()
+            json_file.close()
+            loaded_model = tensorflow.keras.models.model_from_json(loaded_model_json)
+            # load weights into new model
+            loaded_model.load_weights(model_fn_hdf5)
+            print("[INFO] Loaded model from disk ({}, {})".format(model_fn_json, model_fn_hdf5))
+            return loaded_model
 
         if FLAGS.pretrain: 
             #SPATIAL
@@ -529,7 +540,8 @@ if __name__ == "__main__":
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
             spatial_model = compile_model(stream2model(*spatial_stream()), FLAGS.model_dir, optimizer, prefix="spatial_")
-            spatial_history = train_model(spatial_model, FLAGS.epochs, spatial_training_batches, spatial_validation_batches, callbacks, spatial_model_fn_json, prefix="spatial_")
+            spatial_history = train_model(spatial_model, FLAGS.epochs, spatial_training_batches, spatial_validation_batches, callbacks, spatial_model_fn_json, prefix="spatial_", suffix=actor)
+            clear_session()
         if FLAGS.pretrain: 
             #TEMPORAL
             optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5) # best
@@ -547,17 +559,23 @@ if __name__ == "__main__":
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
             temporal_model = compile_model(stream2model(*temporal_stream()), FLAGS.model_dir, optimizer, prefix="temporal_")
-            temporal_history = train_model(temporal_model, FLAGS.epochs, temporal_training_batches, temporal_validation_batches, callbacks, temporal_model_fn_json, prefix="temporal_")
+            temporal_history = train_model(temporal_model, FLAGS.epochs, temporal_training_batches, temporal_validation_batches, callbacks, temporal_model_fn_json, prefix="temporal_", suffix=actor)
+            clear_session()
 
-        clear_session()
-        # load json and create model
-        json_file = open(model_fn_json, 'r')
-        loaded_model_json = json_file.read()
-        json_file.close()
-        loaded_model = tensorflow.keras.models.model_from_json(loaded_model_json)
-        # load weights into new model
-        loaded_model.load_weights(model_fn_hdf5)
-        print("Loaded model from disk")
+        #COMBINED
+        optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5) # best
+        early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
+        terminateNaN = TerminateOnNaN() #that shouldn't happen
+        saveBest = ModelCheckpoint(model_fn_hdf5, save_best_only=True)
+        callbacks=[early_stopping, terminateNaN, saveBest]
+        model = compile_model(merge_streams(*spatial_stream(), *temporal_stream()), FLAGS.model_dir, optimizer)
+        if FLAGS.pretrain: 
+            print("[INFO] Loading in pretrained streams weights...")
+            model.load_weights(temporal_model_fn_hdf5, by_name=True)
+            model.load_weights(spatial_model_fn_hdf5, by_name=True)
+
+        history = train_model(model, FLAGS.epochs, training_batches, validation_batches, callbacks, model_fn_json, suffix=actor)
+
 
         predictions = loaded_model.predict_generator(testing_batches)
         y_pred = np.argmax(predictions, axis=-1)
@@ -569,7 +587,6 @@ if __name__ == "__main__":
         cnfs_mtx_dict[actor] = cnfs_mtx
 
         print("[INFO] Model successfully trained, tested on {} ".format(actor))
-        clear_session()
 
     cross_validation_cnfs_mtx = sum(cnfs_mtx_dict[item] for item in cnfs_mtx_dict)
     cross_validation_accuracy = cross_validation_cnfs_mtx.diagonal().sum()/cross_validation_cnfs_mtx.sum()
