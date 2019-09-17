@@ -15,6 +15,6 @@ Accuracy (LOOCV): 96.98%
 To do:
 
 - [ ] more augmentation methods: shifting
-- [ ] check out cosine loss
+- [x] check out cosine loss (negative/neutral impact on accuracy)
 - [x] pretraining
 - [x] train the streams separately
