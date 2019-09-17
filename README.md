@@ -16,5 +16,5 @@ To do:
 
 - [ ] more augmentation methods: shifting
 - [ ] check out cosine loss
-- [ ] pretraining
-- [ ] train the streams separately
+- [x] pretraining
+- [x] train the streams separately
