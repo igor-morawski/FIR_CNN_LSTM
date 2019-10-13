@@ -30,9 +30,8 @@ from tensorflow.keras.backend import clear_session
 from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN, ModelCheckpoint, ReduceLROnPlateau
 
-# LABELS_REGEX = dataset.LABELS_REGEX #7 labels
-LABELS_REGEX = dataset.PAPER_LABELS_REGEX #5 labels
-CLASSES_N = len(LABELS_REGEX)
+LABELS_REGEX_7 = dataset.LABELS_REGEX #7 labels
+LABELS_REGEX_5 = dataset.PAPER_LABELS_REGEX #5 labels
 
 KERAS_EPSILON = tensorflow.keras.backend.epsilon()
 
@@ -329,6 +328,10 @@ if __name__ == "__main__":
                         type=str,
                         default="/" + os.path.join("tmps", "model"),
                         help='Where to save the trained model.')
+    parser.add_argument('--subdir',
+                        type=str,
+                        default="weigths",
+                        help='Custom naming for subdirectory to save the model in.')
     parser.add_argument(
         '--temperature_dir',
         type=str,
@@ -339,6 +342,10 @@ if __name__ == "__main__":
         type=str,
         default="/" + os.path.join("tmps", "cache", "optical_flow"),
         help='Where to save the cached sequences (optical flow).')
+    parser.add_argument('--classes',
+                        type=int,
+                        default=5,
+                        help='How many classes? 5 if --classes=5, 7 otherwise.')
     parser.add_argument('--epochs',
                         type=int,
                         default=50,
@@ -380,6 +387,13 @@ if __name__ == "__main__":
                         help='Pretrain by training streams separately.')
     FLAGS, unparsed = parser.parse_known_args()
 
+    model_path = os.path.join(FLAGS.model_dir, FLAGS.subdir)
+    if (FLAGS.classes == 5):
+        LABELS_REGEX = LABELS_REGEX_5
+    else:
+        LABELS_REGEX = LABELS_REGEX_7
+    CLASSES_N = len(LABELS_REGEX)
+
     if FLAGS.download:
         dataset.download("..")
 
@@ -418,7 +432,6 @@ if __name__ == "__main__":
         data_fn_y.append([relative_path, y])
 
     cnfs_mtx_dict = dict()
-        
     # LOOCV
     for actor in dataset.ACTORS:
         if FLAGS.actor:
@@ -430,12 +443,12 @@ if __name__ == "__main__":
         training_actors = list(dataset.ACTORS)
         training_actors.remove(testing_actor)
 
-        model_fn_json = os.path.join(FLAGS.model_dir, "model.json")
-        model_fn_hdf5 = os.path.join(FLAGS.model_dir, "model_{}.hdf5".format(actor))
-        spatial_model_fn_json = os.path.join(FLAGS.model_dir, "spatial_model.json")
-        spatial_model_fn_hdf5 = os.path.join(FLAGS.model_dir, "spatial_model_{}.hdf5".format(actor))
-        temporal_model_fn_json = os.path.join(FLAGS.model_dir, "temporal_model.json")
-        temporal_model_fn_hdf5 = os.path.join(FLAGS.model_dir, "temporal_model_{}.hdf5".format(actor))
+        model_fn_json = os.path.join(model_path, "model.json")
+        model_fn_hdf5 = os.path.join(model_path, "model_{}.hdf5".format(actor))
+        spatial_model_fn_json = os.path.join(model_path, "spatial_model.json")
+        spatial_model_fn_hdf5 = os.path.join(model_path, "spatial_model_{}.hdf5".format(actor))
+        temporal_model_fn_json = os.path.join(model_path, "temporal_model.json")
+        temporal_model_fn_hdf5 = os.path.join(model_path, "temporal_model_{}.hdf5".format(actor))
 
         train_val_fns_y = []
         testing_fns_y = []
@@ -509,7 +522,7 @@ if __name__ == "__main__":
             open(model_fn_json, 'w').write(json_string)
             model.summary()
             history = model.fit_generator(training_batches, epochs=FLAGS.epochs, validation_data=validation_batches, callbacks=callbacks)
-            plot_history(history, FLAGS.model_dir, prefix, suffix)
+            plot_history(history, model_path, prefix, suffix)
             return history
 
         def load_checkpoint(model_fn_json, model_fn_hdf5):
@@ -539,7 +552,7 @@ if __name__ == "__main__":
             spatial_testing_batches = DataGenerator(testing_data,
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
-            spatial_model = compile_model(stream2model(*spatial_stream()), FLAGS.model_dir, optimizer, prefix="spatial_")
+            spatial_model = compile_model(stream2model(*spatial_stream()), model_path, optimizer, prefix="spatial_")
             spatial_history = train_model(spatial_model, FLAGS.epochs, spatial_training_batches, spatial_validation_batches, callbacks, spatial_model_fn_json, prefix="spatial_", suffix=actor)
             clear_session()
         if FLAGS.pretrain: 
@@ -558,7 +571,7 @@ if __name__ == "__main__":
             temporal_testing_batches = FlowGenerator(testing_data,
                                         FLAGS.testing_batch_size,
                                         shuffle=False)
-            temporal_model = compile_model(stream2model(*temporal_stream()), FLAGS.model_dir, optimizer, prefix="temporal_")
+            temporal_model = compile_model(stream2model(*temporal_stream()), model_path, optimizer, prefix="temporal_")
             temporal_history = train_model(temporal_model, FLAGS.epochs, temporal_training_batches, temporal_validation_batches, callbacks, temporal_model_fn_json, prefix="temporal_", suffix=actor)
             clear_session()
 
@@ -568,7 +581,7 @@ if __name__ == "__main__":
         terminateNaN = TerminateOnNaN() #that shouldn't happen
         saveBest = ModelCheckpoint(model_fn_hdf5, save_best_only=True)
         callbacks=[early_stopping, terminateNaN, saveBest]
-        model = compile_model(merge_streams(*spatial_stream(), *temporal_stream()), FLAGS.model_dir, optimizer)
+        model = compile_model(merge_streams(*spatial_stream(), *temporal_stream()), model_path, optimizer)
         if FLAGS.pretrain: 
             print("[INFO] Loading in pretrained streams weights...")
             model.load_weights(temporal_model_fn_hdf5, by_name=True)
@@ -576,7 +589,7 @@ if __name__ == "__main__":
 
         history = train_model(model, FLAGS.epochs, training_batches, validation_batches, callbacks, model_fn_json, suffix=actor)
 
-
+        loaded_model = load_checkpoint(model_fn_json, model_fn_hdf5)
         predictions = loaded_model.predict_generator(testing_batches)
         y_pred = np.argmax(predictions, axis=-1)
         y_test = np.argmax(testing_batches[0][1], axis=-1)
@@ -594,5 +607,5 @@ if __name__ == "__main__":
     metrics = dict()
     metrics["confusion_matrix"] = cross_validation_cnfs_mtx
     metrics["accuracy"] = cross_validation_accuracy
-    np.save(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), metrics)
-    # metrics = np.load(os.path.join(FLAGS.model_dir, "metrics_dict.npy"), allow_pickle=True)[()]
+    np.save(os.path.join(model_path, "metrics_dict.npy"), metrics)
+    # metrics = np.load(os.path.join(model_path, "metrics_dict.npy"), allow_pickle=True)[()]
