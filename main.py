@@ -608,4 +608,6 @@ if __name__ == "__main__":
     metrics["confusion_matrix"] = cross_validation_cnfs_mtx
     metrics["accuracy"] = cross_validation_accuracy
     np.save(os.path.join(model_path, "metrics_dict.npy"), metrics)
-    # metrics = np.load(os.path.join(model_path, "metrics_dict.npy"), allow_pickle=True)[()]
+    metrics = np.load(os.path.join(model_path, "metrics_dict.npy"), allow_pickle=True)[()]
+    print(metrics["confusion_matrix"])
+    print(metrics["accuracy"])
