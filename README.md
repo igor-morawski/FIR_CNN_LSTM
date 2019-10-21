@@ -26,6 +26,7 @@ Accuracy (LOSOCV): 91.63%
 
 To do:
 
+- [ ] log confusion matrix and accuracy for the branches 
 - [x] experiments on 5 & 7 classess
 - [x] check out cosine loss (negative/neutral impact on accuracy)
 - [x] pretraining
