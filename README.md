@@ -14,7 +14,7 @@ Accuracy (LOSOCV): 96.98%
 
 Accuracy (LOSOCV): 91.63%
 
-|           | walk | sitdown | standup | falling | sitting | lying | no standing |
+|           | walk | sitdown | standup | falling | sitting | lying | standing |
 |:---------:|:----:|:-------:|:-------:|:-------:|:---------:|:---------:|:---------:|
 |    **walk**   |  355 |    0    |    1     |    0    |      0    |      1    |      3   |
 |   **sitdown** |  1 |    308    |    45    |    1    |      4    |      0    |      1    |
