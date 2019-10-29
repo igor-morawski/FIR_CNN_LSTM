@@ -12,17 +12,17 @@ Accuracy (LOSOCV): 96.98%
 | **no action** |   4  |    4    |    0    |    0    |    1072   |
 
 
-Accuracy (LOSOCV): 91.63%
+Accuracy (LOSOCV): 90.87%
 
-|           | walk | sitdown | standup | falling | sitting | lying | no standing |
+|           | walk | sitdown | standup | falling | sitting | lying | standing |
 |:---------:|:----:|:-------:|:-------:|:-------:|:---------:|:---------:|:---------:|
-|    **walk**   |  355 |    0    |    1     |    0    |      0    |      1    |      3   |
-|   **sitdown** |  1 |    308    |    45    |    1    |      4    |      0    |      1    |
-|  **standup**  |  1 |    25    |    32     |    3    |      2    |      0    |      7    |
-|  **falling**  |  0 |    8    |    6       |    339    |      0    |      7    |      0   |
-|  **sitting**  |  0 |    0    |    0       |    0    |      318    |      2    |      40    |
-|  **lying**    |  0 |    1    |    0       |    5    |      4    |      347    |      3    |
-|  **standing** |  0 |    0    |    4       |    0    |      35    |      1   |      320    |
+|    **walk**   |  355 |    1    |    2     |    0    |      0    |      1    |      1   |
+|   **sitdown** |  1 |    310    |    39    |    7    |      2    |      0    |      1    |
+|  **standup**  |  1 |    37    |    318     |    1    |      0    |      0    |      3    |
+|  **falling**  |  0 |    3    |    4       |    349    |      1    |      3    |      0   |
+|  **sitting**  |  0 |    2    |    1       |    0    |      299    |      9    |      49    |
+|  **lying**    |  0 |    0    |    0       |    6    |      5    |      346    |      3    |
+|  **standing** |  0 |    0    |    6       |    0    |      40    |      1   |      313    |
 
 To do:
 
