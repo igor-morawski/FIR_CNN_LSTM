@@ -5,6 +5,7 @@ from tools import augmentation as augment
 
 import os
 import argparse
+import pandas as pd
 
 from glob import glob
 import collections
@@ -29,6 +30,7 @@ from tools.flow import farneback, farneback_mag
 from tensorflow.keras.backend import clear_session
 from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import EarlyStopping, TerminateOnNaN, ModelCheckpoint, ReduceLROnPlateau
+
 
 LABELS_REGEX_7 = dataset.LABELS_REGEX #7 labels
 LABELS_REGEX_5 = dataset.PAPER_LABELS_REGEX #5 labels
@@ -385,6 +387,12 @@ if __name__ == "__main__":
     parser.add_argument("--pretrain",
                         action="store_true",
                         help='Pretrain by training streams separately.')
+    parser.add_argument("--temporal_only",
+                        action="store_true",
+                        help='Train temporal only.')
+    parser.add_argument("--spatial_only",
+                        action="store_true",
+                        help='Train spatial only.')
     FLAGS, unparsed = parser.parse_known_args()
 
     model_path = os.path.join(FLAGS.model_dir, FLAGS.subdir)
@@ -396,6 +404,9 @@ if __name__ == "__main__":
 
     if FLAGS.download:
         dataset.download("..")
+
+    if FLAGS.temporal_only and FLAGS.spatial_only:
+        raise ValueError 
 
     data_normalized = Dataset(FLAGS.dataset_dir, minmax_normalized=True)
 
@@ -536,7 +547,7 @@ if __name__ == "__main__":
             print("[INFO] Loaded model from disk ({}, {})".format(model_fn_json, model_fn_hdf5))
             return loaded_model
 
-        if FLAGS.pretrain: 
+        if (FLAGS.pretrain or FLAGS.spatial_only): 
             #SPATIAL
             optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5, momentum=0.5, nesterov=True) # best
             early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
@@ -554,8 +565,20 @@ if __name__ == "__main__":
                                         shuffle=False)
             spatial_model = compile_model(stream2model(*spatial_stream()), model_path, optimizer, prefix="spatial_")
             spatial_history = train_model(spatial_model, FLAGS.epochs, spatial_training_batches, spatial_validation_batches, callbacks, spatial_model_fn_json, prefix="spatial_", suffix=actor)
+            if FLAGS.spatial_only:
+                loaded_model = spatial_model = compile_model(stream2model(*spatial_stream()), model_path, optimizer, prefix="spatial_")
+                loaded_model.load_weights(spatial_model_fn_hdf5, by_name=True)
+                predictions = loaded_model.predict_generator(spatial_testing_batches)
+                y_pred = np.argmax(predictions, axis=-1)
+                y_test = np.argmax(spatial_testing_batches[0][1], axis=-1)
+                cnfs_mtx = confusion_matrix(y_test, y_pred)
+                print(accuracy_score(y_test, y_pred))
+                C = cnfs_mtx / cnfs_mtx.astype(np.float).sum(axis=1)
+                cnfs_mtx_dict[actor] = cnfs_mtx
+                continue
             clear_session()
-        if FLAGS.pretrain: 
+
+        if (FLAGS.pretrain or FLAGS.temporal_only): 
             #TEMPORAL
             optimizer = optimizers.SGD(lr=FLAGS.learning_rate, clipnorm=0.5) # best
             early_stopping = EarlyStopping(monitor='val_loss', patience=20, verbose=1)
@@ -573,6 +596,17 @@ if __name__ == "__main__":
                                         shuffle=False)
             temporal_model = compile_model(stream2model(*temporal_stream()), model_path, optimizer, prefix="temporal_")
             temporal_history = train_model(temporal_model, FLAGS.epochs, temporal_training_batches, temporal_validation_batches, callbacks, temporal_model_fn_json, prefix="temporal_", suffix=actor)
+            if FLAGS.temporal_only:
+                loaded_model = temporal_model = compile_model(stream2model(*temporal_stream()), model_path, optimizer, prefix="temporal_")
+                loaded_model.load_weights(temporal_model_fn_hdf5, by_name=True)
+                predictions = loaded_model.predict_generator(temporal_testing_batches)
+                y_pred = np.argmax(predictions, axis=-1)
+                y_test = np.argmax(temporal_testing_batches[0][1], axis=-1)
+                cnfs_mtx = confusion_matrix(y_test, y_pred)
+                print(accuracy_score(y_test, y_pred))
+                C = cnfs_mtx / cnfs_mtx.astype(np.float).sum(axis=1)
+                cnfs_mtx_dict[actor] = cnfs_mtx
+                continue
             clear_session()
 
         #COMBINED
@@ -584,8 +618,8 @@ if __name__ == "__main__":
         model = compile_model(merge_streams(*spatial_stream(), *temporal_stream()), model_path, optimizer)
         if FLAGS.pretrain: 
             print("[INFO] Loading in pretrained streams weights...")
-            model.load_weights(temporal_model_fn_hdf5, by_name=True)
             model.load_weights(spatial_model_fn_hdf5, by_name=True)
+            model.load_weights(temporal_model_fn_hdf5, by_name=True)
 
         history = train_model(model, FLAGS.epochs, training_batches, validation_batches, callbacks, model_fn_json, suffix=actor)
 
@@ -596,7 +630,6 @@ if __name__ == "__main__":
         cnfs_mtx = confusion_matrix(y_test, y_pred)
         print(accuracy_score(y_test, y_pred))
         C = cnfs_mtx / cnfs_mtx.astype(np.float).sum(axis=1)
-
         cnfs_mtx_dict[actor] = cnfs_mtx
 
         print("[INFO] Model successfully trained, tested on {} ".format(actor))
@@ -611,3 +644,14 @@ if __name__ == "__main__":
     metrics = np.load(os.path.join(model_path, "metrics_dict.npy"), allow_pickle=True)[()]
     print(metrics["confusion_matrix"])
     print(metrics["accuracy"])
+
+    with open(os.path.join(model_path,'cnfs_mtx.txt'),'wb') as f:
+        for line in np.matrix(cross_validation_cnfs_mtx):
+            np.savetxt(f, line, fmt='%.4f')
+
+    with open(os.path.join(model_path,'accuracy.txt'),'wb') as f:
+        for line in np.matrix(cross_validation_accuracy):
+            np.savetxt(f, line, fmt='%.4f')
+
+
+
