@@ -5,6 +5,6 @@ $subdir = "paper"
 $classes = (7)
 foreach ($class_n in $classes) {
     $cmd = "python main.py --epochs=$epochs --subdir=$($class_n)_$($subdir) --classes=$class_n";
-    $cmd;
+    $cmd; 
     Invoke-Expression -Command $cmd; 
 }
